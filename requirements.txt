@@ -62,7 +62,7 @@
 
 fastapi==0.124.4
 uvicorn==0.38.0
-google-genai==1.55.0
+google-genai==1.47.0
 google-cloud-aiplatform==1.126.1
 pydantic==2.12.3
 requests==2.32.5
