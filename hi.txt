@@ -1,0 +1,290 @@
+from google import genai
+from google.genai import types
+import base64
+import os
+
+def generate():
+  client = genai.Client(
+      vertexai=True,
+      api_key=os.environ.get("GOOGLE_CLOUD_API_KEY"),
+  )
+
+  msg2_text1 = types.Part.from_text(text="""generate a script for my youtube video on virat kohli , include his struggle and achievement and emphasis on his mindset as an athlete. Also give visual ideas for the youtube video""")
+  msg3_text1 = types.Part.from_text(text="""**Crafting Kohli's Narrative**
+
+I'm currently fleshing out the introduction to the script. I'm focusing on a hook that immediately grabs the viewer's attention, perhaps by highlighting a particularly challenging moment in Kohli's career. From there, I plan to smoothly transition into showcasing his greatest accomplishments, all the while considering the best visual accompaniment. I'm also exploring different narrative techniques.
+
+
+**Outlining the Structure**
+
+I'm now sketching out the script's core structure. I'm focusing on weaving together Kohli's struggles, triumphs, and mental fortitude. I intend to open with a potent visual and a gripping anecdote, then transition to his achievements, punctuated by insights into his mindset. I'll need to finalize the outro, summarizing his legacy.
+
+
+**Gathering Insights Swiftly**
+
+I've got a solid grasp of Virat Kohli's journey. Early career setbacks like the U-14 trials are noted. I'm focusing now on arranging these pieces, creating a robust, informative script. I'm prioritizing accuracy and clarity to craft the perfect introduction to the man, the myth, the legend!
+
+
+**Organizing the Narrative**
+
+I'm presently categorizing the gathered data to build a coherent narrative. The list of Kohli's achievements, set against his struggles, paints a compelling picture. I'll need to interweave these key moments for impact. I'm focusing on the chronological order, incorporating citations to maintain accuracy.
+
+
+**Crafting the Outline**
+
+I'm now integrating the compiled information. I'll arrange the data, including struggles, achievements, and mindset. I'll use direct quotes to support key points. The core script structure is taking shape, with sections on early career, setbacks, dominance, and a final conclusion.
+
+
+**Compiling the Data**
+
+I'm presently cataloging all the information gathered. I have a detailed breakdown of Kohli's struggles, achievements, and mindset. I'm now crafting visual ideas to go with the narrative and planning the script structure. The research is complete, and the script is almost ready.
+
+
+**Synthesizing and Drafting**
+
+I've got the data organized, complete with visual ideas and the planned script structure. Now, I'm working to integrate it all. I'll include direct quotes and statistics. The script is being created to be a compelling and factual narrative of the player's life.""")
+  msg3_text2 = types.Part.from_text(text="""Here's a script for your YouTube video on Virat Kohli, highlighting his struggles, achievements, and remarkable mindset:
+
+**Video Title:** Virat Kohli: The King Who Conquered His Own Mind
+
+**Ad Length:** 8-10 minutes (YouTube standard)
+
+**(Opening Scene: Dynamic montage of Virat Kohli's greatest cricketing moments – powerful cover drives, aggressive celebrations, lifting trophies. Upbeat, cinematic music starts, then softens slightly to a reflective tone.)**
+
+**VO (Voiceover - Confident, engaging, and slightly dramatic):** In the pantheon of cricketing legends, few names shine as brightly as Virat Kohli. A force of nature, a record-breaker, a leader. But behind the roar of the crowd and the gleam of the trophies lies a story far more profound – a saga of struggle, unyielding grit, and a mindset forged in fire.
+
+**(Scene 1: Childhood photos of a young, determined Virat. Quick cuts to snippets of early cricket training, dusty grounds, a young boy practicing alone.)**
+
+**VO:** From the bylanes of Delhi, a young Virat Kohli dreamt of representing India. But this wasn't a journey paved with ease. Early on, he faced setbacks, even being overlooked in under-14 trials despite his talent. His family grappled with financial difficulties, making the dream seem distant.
+
+**(Scene 2: A somber transition. A black and white photo of Virat's father, Prem Kohli. Footage of young Virat playing cricket, then suddenly looking reflective on the field.)**
+
+**VO:** Then, tragedy struck. At just 18, while playing a crucial Ranji Trophy match for Delhi, Virat received news that would change his life forever: his father had passed away. Most would have crumbled. But Virat, with an unshakeable resolve, returned to the crease the next day, scoring a vital 90 runs to save his team. It was a stark early lesson in commitment, sacrifice, and the raw power of mental fortitude.
+
+**(Scene 3: Fast-paced montage: Virat leading the U-19 World Cup team to victory in 2008, his debut for India, celebrating the 2011 World Cup win and 2013 Champions Trophy. On-screen text flashes: \"U-19 World Cup Captain,\" \"2011 World Cup Winner.\")**
+
+**VO:** That steely determination propelled him forward. He captained India to the U-19 World Cup title in 2008 and quickly earned his spot in the national team. He became a crucial part of India’s 2011 ODI World Cup and 2013 Champions Trophy winning squads. The prodigy was rising.
+
+**(Scene 4: A sudden shift to clips of Virat struggling in the 2014 England tour – mistimed shots, dismissals, frustrated expressions. On-screen text: \"England Tour 2014: A Major Setback.\")**
+
+**VO:** But even legends face their trials by fire. The 2014 tour of England was a devastating slump, a period where runs dried up, and doubts began to surface about his technique in Test cricket. The pressure was immense.
+
+**(Scene 5: Archival interview snippets of Kohli talking about learning from mistakes, hard work. Training footage – intense gym sessions, running, focused batting practice. Upbeat, motivational music returns.)**
+
+**VO:** Yet, this was the crucible where his mindset truly solidified. He didn't shy away from his weaknesses. Instead, he embarked on a relentless journey of self-improvement, transforming his fitness and refining his game. \"Self-belief and hard work will always earn you success,\" he often says. He embraced the philosophy: \"Consistency beats talent on days when talent doesn't show up.\"
+
+**(Scene 6: Montage of Kohli's dominant era – smashing centuries across formats, breaking records, leading India as Test captain. Rapid display of stats and records: \"Fastest to 10,000 ODI Runs,\" \"Most Test Wins as Indian Captain.\" Images of him receiving ICC awards like \"Cricketer of the Decade.\")**
+
+**VO:** What followed was an era of unprecedented dominance. Virat Kohli became the fastest to countless ODI milestones, often averaging over 50 in all three formats simultaneously. As India's most successful Test captain, he led the team to historic victories, including their first Test series win in Australia. He became the first player to score 20,000 international runs in a single decade and amassed a staggering 10 ICC awards, including the \"Cricketer of the Decade.\" He was King Kohli, the Chase Master.
+
+**(Scene 7: Another somber shift. Kohli looking tired, frustrated, glimpses of media headlines questioning his form (without showing specifics). On-screen text: \"The Century Drought: 2019-2022.\")**
+
+**VO:** But the greatest tests often come when you're at the peak. From late 2019 to 2022, Virat entered an unexpected and prolonged century drought. The very player known for his consistency struggled to convert starts into big scores. He stepped down from captaincy across all formats, openly admitting to periods of mental fatigue. The pressure of expectations, the constant scrutiny – it all took its toll.
+
+**(Scene 8: Intense training footage – weights, cardio, yoga, focused expression. Interspersed with quotes from Kohli about mindset and discipline. \"Discipline is not just about training hard, but about how you live your life every day.\" \"Fitness is a lifestyle, not a phase.\")**
+
+**VO:** This was his ultimate challenge. The world watched, questioning if the King would ever reign again. But Virat Kohli's mindset, honed over years, refused to yield. He doubled down on his rigorous fitness routine – a blend of strength training, HIIT, endurance, and yoga, complemented by a strict, clean diet. He understood that \"discipline beats motivation.\" He found strength in introspection, committing to the hard work even when he didn't feel like it. \"Rise after every fall — resilience carves champions out of setbacks,\" he declared.
+
+**(Scene 9: Montage of his sensational comeback. The Asia Cup 2022 century, the iconic 82* against Pakistan in the T20 World Cup, his record-breaking form in the 2023 ODI World Cup, scoring his 50th ODI hundred, surpassing Sachin Tendulkar. Crowd cheering wildly.)**
+
+**VO:** And then, the King returned. A magnificent century in the 2022 Asia Cup marked his maiden T20I hundred and the end of the drought. He then etched his name in history with an unforgettable 82 not out against Pakistan in the T20 World Cup. The fairytale continued in the 2023 ODI World Cup, where he was named Player of the Tournament for his record-breaking 765 runs and achieved the monumental feat of 50 ODI centuries, surpassing the legendary Sachin Tendulkar.
+
+**(Scene 10: Final montage – a mix of his focused intensity on the field, moments of joy, interacting with fans, lifting trophies. Upbeat, inspirational music swells.)**
+
+**VO:** Virat Kohli's journey is more than just statistics and records; it's a testament to the power of a relentless human spirit. It's about facing adversity head-on, adapting, growing, and owning every single chapter of your story. His career reminds us that true greatness isn't just about the highs, but how you navigate the lows and come back stronger.
+
+**(On-screen Text: \"Virat Kohli: The King Who Conquered His Own Mind\")**
+
+**VO:** What part of Virat's journey inspires you the most? Share your thoughts in the comments below! Don't forget to like this video, subscribe for more inspiring stories, and tell us which athlete's mindset we should explore next!
+
+**(End Screen: Channel logo, links to subscribe, and other videos. Music fades out.)**""")
+  si_text1 = """### ROLE ###
+You are an expert scriptwriter for a creative advertising agency, specializing in creating interesting and audience-engaging video ad scripts.
+
+### INSTRUCTIONS ###
+- Your task is to write a script for a short video advertisement based on the provided product details.
+- Analyze the input details: product name, target audience, key features, desired tone, and call to action.
+- Write a script that is modern, upbeat, and visually appealing.
+- Ensure the script highlights the specified key features.
+- Conclude with a clear call to action, including any specified hashtags.
+- Format the script with scene descriptions in parentheses and speaker labels (e.g., VO for voiceover) in bold.
+
+### EXAMPLE ###
+
+Input:
+- Product: \"Fizz\" sparkling water
+- Ad Length: 30 seconds
+- Target Audience: Millennials who are health-conscious and active on social media.
+- Key Features: All-natural ingredients, zero calories, and a variety of unique fruit flavors.
+- Tone: Upbeat, modern, and visually appealing.
+- Call to Action: Encourage viewers to try Fizz and share their experience on social media.
+- Hashtag: #FizzLife
+
+Output:
+**Script:**
+
+**(Scene: A brightly lit, minimalist studio with a colorful backdrop. A diverse group of millennials are laughing and dancing in slow motion. Upbeat, indie-pop music plays.)**
+
+**VO (Voiceover, warm and friendly):** Tired of the same old boring?
+
+**(Scene: A close-up of a can of Fizz, condensation dripping down the side. A hand reaches in and grabs it.)**
+
+**VO:** Get ready to add a little sparkle to your life.
+
+**(Scene: A montage of quick cuts showing people enjoying Fizz in various settings: a yoga class, a rooftop party, a picnic in the park. Each person takes a sip and smiles, refreshed.)**
+
+**VO:** This is Fizz. The new sparkling water that's all-natural, zero calories, and bursting with amazing fruit flavors.
+
+**(Scene: The group of millennials from the beginning are now holding cans of Fizz, toasting to the camera.)**
+
+**On-screen text:** #FizzLife
+
+**VO:** So what are you waiting for? Grab a Fizz and join the fun.
+
+**(Scene: A final shot of the Fizz can with the brand's logo and tagline: \"Fizz: Add a little sparkle.\")**
+
+**VO:** Fizz. Add a little sparkle. Try it today and share your #FizzLife with us!
+
+### YOUR TASK ###
+
+Input:
+- Product: {{product_name}}
+- Ad Length: {{ad_length}}
+- Target Audience: {{target_audience}}
+- Key Features: {{key_features}}
+- Tone: {{tone}}
+- Call to Action: {{call_to_action}}
+- Hashtag: {{hashtag}}
+
+Output:"""
+
+  model = "projects/331298860778/locations/us-central1/endpoints/4283898512443179008"
+  contents = [
+    types.Content(
+      role="model",
+      parts=[
+        types.Part.from_text(text="""Optimize for addressing more use cases, and generating better output.""")
+      ]
+    ),
+    types.Content(
+      role="user",
+      parts=[
+        msg2_text1
+      ]
+    ),
+    types.Content(
+      role="model",
+      parts=[
+        msg3_text1,
+        msg3_text2
+      ]
+    ),
+  ]
+  tools = [
+    types.Tool(google_search=types.GoogleSearch()),
+  ]
+
+  generate_content_config = types.GenerateContentConfig(
+    temperature = 1,
+    top_p = 1,
+    max_output_tokens = 65535,
+    safety_settings = [types.SafetySetting(
+      category="HARM_CATEGORY_HATE_SPEECH",
+      threshold="OFF"
+    ),types.SafetySetting(
+      category="HARM_CATEGORY_DANGEROUS_CONTENT",
+      threshold="OFF"
+    ),types.SafetySetting(
+      category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+      threshold="OFF"
+    ),types.SafetySetting(
+      category="HARM_CATEGORY_HARASSMENT",
+      threshold="OFF"
+    )],
+    tools = tools,
+    system_instruction=[types.Part.from_text(text=si_text1)],
+    thinking_config=types.ThinkingConfig(
+      thinking_budget=-1,
+    ),
+  )
+
+  for chunk in client.models.generate_content_stream(
+    model = model,
+    contents = contents,
+    config = generate_content_config,
+    ):
+    if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
+        continue
+    print(chunk.text, end="")
+
+generate()
+
+
+
+### ROLE ###
+You are an expert scriptwriter for a creative advertising agency, specializing in creating interesting and audience-engaging video ad scripts.
+
+### INSTRUCTIONS ###
+- Your task is to write a script for a short video advertisement based on the provided product details.
+- Analyze the input details: product name, target audience, key features, desired tone, and call to action.
+- Write a script that is modern, upbeat, and visually appealing.
+- Ensure the script highlights the specified key features.
+- Conclude with a clear call to action, including any specified hashtags.
+- Format the script with scene descriptions in parentheses and speaker labels (e.g., VO for voiceover) in bold.
+
+### EXAMPLE ###
+
+Input:
+- Product: "Fizz" sparkling water
+- Ad Length: 30 seconds
+- Target Audience: Millennials who are health-conscious and active on social media.
+- Key Features: All-natural ingredients, zero calories, and a variety of unique fruit flavors.
+- Tone: Upbeat, modern, and visually appealing.
+- Call to Action: Encourage viewers to try Fizz and share their experience on social media.
+- Hashtag: #FizzLife
+
+Output:
+**Script:**
+
+**(Scene: A brightly lit, minimalist studio with a colorful backdrop. A diverse group of millennials are laughing and dancing in slow motion. Upbeat, indie-pop music plays.)**
+
+**VO (Voiceover, warm and friendly):** Tired of the same old boring?
+
+**(Scene: A close-up of a can of Fizz, condensation dripping down the side. A hand reaches in and grabs it.)**
+
+**VO:** Get ready to add a little sparkle to your life.
+
+**(Scene: A montage of quick cuts showing people enjoying Fizz in various settings: a yoga class, a rooftop party, a picnic in the park. Each person takes a sip and smiles, refreshed.)**
+
+**VO:** This is Fizz. The new sparkling water that's all-natural, zero calories, and bursting with amazing fruit flavors.
+
+**(Scene: The group of millennials from the beginning are now holding cans of Fizz, toasting to the camera.)**
+
+**On-screen text:** #FizzLife
+
+**VO:** So what are you waiting for? Grab a Fizz and join the fun.
+
+**(Scene: A final shot of the Fizz can with the brand's logo and tagline: "Fizz: Add a little sparkle.")**
+
+**VO:** Fizz. Add a little sparkle. Try it today and share your #FizzLife with us!
+
+### YOUR TASK ###
+
+Input:
+- Product: {{product_name}}
+- Ad Length: {{ad_length}}
+- Target Audience: {{target_audience}}
+- Key Features: {{key_features}}
+- Tone: {{tone}}
+- Call to Action: {{call_to_action}}
+- Hashtag: {{hashtag}}
+
+Output:
+
+
+
+(.venv) jayagrawal@Bhavyas-MacBook script-backend % curl -X POST http://localhost:8000/chat \  -H "Content-Type: application/json" \
+  -d '{
+    "message":"Write a detailed romantic poem of at least 20 lines.",
+    "max_tokens":400
+  }'
