@@ -6,6 +6,10 @@ from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
 import csv
+import base64
+import os
+import json
+import tempfile
 import pathlib
 import textwrap
 
@@ -32,17 +36,50 @@ from vertexai.generative_models import (
 
 
 # Initialize Vertex AI ONCE (startup time)
-vertexai.init(
-    project="poc-script-genai",
-    location="us-central1",
-)
+# vertexai.init(
+#     project="poc-script-genai",
+#     location="us-central1",
+# )
 
-model = GenerativeModel(
-    "projects/poc-script-genai/locations/us-central1/endpoints/1201184567508074496"
-)
+# model = GenerativeModel(
+#     "projects/poc-script-genai/locations/us-central1/endpoints/1201184567508074496"
+# )
 
 
 app = FastAPI()
+
+def init_vertex():
+    # 1. Prefer base64-encoded service account in VERTEX_SERVICE_ACCOUNT_BASE64
+    key_b64 = os.environ.get("VERTEX_SERVICE_ACCOUNT_BASE64")
+    if key_b64:
+        creds_json = base64.b64decode(key_b64).decode("utf-8")
+        creds = json.loads(creds_json)
+
+        # Write to temp file (Vertex requires a file)
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            json.dump(creds, f)
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
+    else:
+        # Fallback: allow GOOGLE_APPLICATION_CREDENTIALS to be set directly
+        gpath = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if not gpath or not os.path.exists(gpath):
+            raise RuntimeError("VERTEX_SERVICE_ACCOUNT_BASE64 not set and GOOGLE_APPLICATION_CREDENTIALS missing or invalid")
+
+    # Initialize Vertex AI
+    vertexai.init(
+        project="poc-script-genai",
+        location="us-central1",
+    )
+
+@app.on_event("startup")
+def startup_event():
+    init_vertex()
+    # Create model after Vertex is initialized
+    global model
+    model = GenerativeModel(
+        "projects/poc-script-genai/locations/us-central1/endpoints/1201184567508074496"
+    )
+
 
 # CORS React frontend support
 app.add_middleware(
@@ -65,6 +102,11 @@ class ChatRequest(BaseModel):
 @app.get("/")
 def root():
     return {"status": "bkl chalrha hai"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 
 # @app.post("/chat")
 # def chat(req: ChatRequest):
