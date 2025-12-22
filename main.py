@@ -62,7 +62,7 @@ class ChatRequest(BaseModel):
     message: str
 
 
-@app.get("/")
+@app.get("/health")
 def root():
     return {"status": "bkl chalrha hai"}
 
