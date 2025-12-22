@@ -5,7 +5,7 @@ asgiref==3.10.0
 cachetools==6.2.1
 certifi==2025.10.5
 charset-normalizer==3.4.4
-click==8.3.0
+click==8.1.0
 distro==1.9.0
 docstring_parser==0.17.0
 fastapi==0.124.4
@@ -63,3 +63,4 @@ websockets==15.0.1
 zipp==3.23.0
 fastapi
 uvicorn
+
