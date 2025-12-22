@@ -6,3 +6,5 @@ __pycache__
 # Service account keys
 vertex-key.json
 poc-script-genai-47e9869b446c.json
+
+vertex-key.json
