@@ -9,8 +9,8 @@ click==8.1.8
 distro==1.9.0
 docstring_parser==0.17.0
 fastapi==0.124.4
-genkit==0.4.0
-genkit-plugin-google-genai==0.4.0
+genkit==0.3.1
+genkit-plugin-google-genai==0.3.1
 google-api-core==2.28.1
 google-auth==2.43.0
 google-cloud-aiplatform==1.126.1
@@ -61,6 +61,5 @@ urllib3==2.5.0
 uvicorn==0.38.0
 websockets==15.0.1
 zipp==3.23.0
-fastapi
-uvicorn
+
 
