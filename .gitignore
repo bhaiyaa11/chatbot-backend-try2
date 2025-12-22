@@ -2,3 +2,7 @@
 __pycache__
 *.pyc
 .python-version
+
+# Service account keys
+vertex-key.json
+poc-script-genai-47e9869b446c.json

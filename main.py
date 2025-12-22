@@ -62,7 +62,7 @@ class ChatRequest(BaseModel):
     message: str
 
 
-@app.get("/health")
+@app.get("/")
 def root():
     return {"status": "bkl chalrha hai"}
 
@@ -323,5 +323,3 @@ USER TASK:
 
 
 
-
-# i am giving a speech on LLMs , i have attached a document go through it and create a 5 minute speech. target audience are students who are AI enthusiast . keep the tone of the speech more interesting and interactive, try to add examples , idioms and jokes whereever posible
