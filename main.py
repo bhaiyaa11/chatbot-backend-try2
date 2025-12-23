@@ -91,9 +91,9 @@ class ChatRequest(BaseModel):
 def root():
     return {"status": "bkl chalrha hai"}
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+# @app.get("/health")
+# def health():
+#     return {"status": "ok"}
 
 
 @app.post("/chat")
