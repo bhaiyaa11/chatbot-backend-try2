@@ -534,6 +534,54 @@ async def chat(
     # --------------------------------------------------
     # STREAM RESPONSE
     # --------------------------------------------------
+
+# def sanitize_output(text: str) -> str:
+#         replacements = {
+#             "###": "",
+#             "***": "",
+#             "**": "",
+#         }
+#         for k, v in replacements.items():
+#             text = text.replace(k, v)
+#         return text.strip()
+
+#     def normalize_markdown_table(text: str) -> str:
+#         """
+#         Converts pipe-collapsed markdown into a proper row-based markdown table.
+#         """
+
+#         # Remove accidental double pipes and trim
+#         text = text.replace("||", "|").replace("**", "").strip()
+
+#         # Split by pipe and clean cells
+#         cells = [c.strip() for c in text.split("||") if c.strip()]
+
+#         # Expected columns: 3
+#         cols = 3
+
+#         # If not divisible, return original text
+#         if len(cells) < cols:
+#             return text
+
+#         rows = [cells[i:i+cols] for i in range(0, len(cells), cols)]
+
+#         # Build markdown table
+#         table = []
+#         table.append(f"| {rows[0][0]} | {rows[0][1]} | {rows[0][2]} |")
+#         table.append("| :------- | :--------- | :--------- |")
+
+#         for row in rows[1:]:
+#             if len(row) == cols:
+#                 table.append(f"| {row[0]} | {row[1]} | {row[2]} |")
+
+#         return "\n".join(table)
+
+#     # ✅ POST-PROCESSING PIPELINE
+#     clean_text = sanitize_output(final_text)
+#     markdown_table = normalize_markdown_table(clean_text)
+#     return {"reply": markdown_table}
+
+
     final = ""
     stream = model.generate_content(parts, stream=True)
 
