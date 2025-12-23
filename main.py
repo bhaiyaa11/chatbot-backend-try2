@@ -1,56 +1,398 @@
-from importlib.resources import contents
-from fastapi import FastAPI, UploadFile, File, Form, types
-from fastapi.middleware.cors import CORSMiddleware
-from pypdf import PdfReader
-from docx import Document
-from openpyxl import load_workbook
-from pptx import Presentation
-import csv
-import base64
-import os
-import json
-import tempfile
-import pathlib
-import textwrap
+# from importlib.resources import contents
+# from fastapi import FastAPI, UploadFile, File, Form, types
+# from fastapi.middleware.cors import CORSMiddleware
+# from pypdf import PdfReader
+# from docx import Document
+# from openpyxl import load_workbook
+# from pptx import Presentation
+# import csv
+# import base64
+# import os
+# import json
+# import tempfile
+# import pathlib
+# import textwrap
 
-try:
-    from IPython.display import display, Markdown
-except Exception:
-    # IPython is optional for server runs; provide no-op fallbacks so
-    # importing this module doesn't fail when IPython isn't installed.
-    def display(*_args, **_kwargs):
-        return None
+# try:
+#     from IPython.display import display, Markdown
+# except Exception:
+#     # IPython is optional for server runs; provide no-op fallbacks so
+#     # importing this module doesn't fail when IPython isn't installed.
+#     def display(*_args, **_kwargs):
+#         return None
 
-    def Markdown(text):
-        return text
-import io
-from pydantic import BaseModel
+#     def Markdown(text):
+#         return text
+# import io
+# from pydantic import BaseModel
 
-import vertexai
-from vertexai.generative_models import (
-    GenerativeModel,
-    Part,
-)
+# import vertexai
+# from vertexai.generative_models import (
+#     GenerativeModel,
+#     Part,
+# )
+
+# # app = FastAPI()
+
+# # # CORS React frontend support
+# # app.add_middleware(
+# #     CORSMiddleware,
+# #     allow_origins=[
+# #         r"https://.*\.vercel\.app",
+# #         "https://chatbot-ks9sf9w5k-bhavyas-projects-bad1561c.vercel.app",       
+# #         "https://chatbot-aim.vercel.app",
+# #         "http://localhost:5173",
+# #         # "http://127.0.0.1:5173",
+# #     ],
+# #     allow_credentials=True,
+# #     allow_methods=["*"],
+# #     allow_headers=["*"],
+# # )
 
 # app = FastAPI()
 
-# # CORS React frontend support
 # app.add_middleware(
 #     CORSMiddleware,
-#     allow_origins=[
-#         r"https://.*\.vercel\.app",
-#         "https://chatbot-ks9sf9w5k-bhavyas-projects-bad1561c.vercel.app",       
-#         "https://chatbot-aim.vercel.app",
-#         "http://localhost:5173",
-#         # "http://127.0.0.1:5173",
-#     ],
+#     allow_origin_regex=r"https://.*\.vercel\.app",
 #     allow_credentials=True,
 #     allow_methods=["*"],
 #     allow_headers=["*"],
 # )
 
+
+
+
+# def init_vertex():
+#     # 1. Prefer base64-encoded service account in VERTEX_SERVICE_ACCOUNT_BASE64
+#     key_b64 = os.environ.get("VERTEX_SERVICE_ACCOUNT_BASE64")
+#     if key_b64:
+#         creds_json = base64.b64decode(key_b64).decode("utf-8")
+#         creds = json.loads(creds_json)
+
+#         # Write to temp file (Vertex requires a file)
+#         with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+#             json.dump(creds, f)
+#             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
+#     else:
+#         # Fallback: allow GOOGLE_APPLICATION_CREDENTIALS to be set directly
+#         gpath = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+#         if not gpath or not os.path.exists(gpath):
+#             raise RuntimeError("VERTEX_SERVICE_ACCOUNT_BASE64 not set and GOOGLE_APPLICATION_CREDENTIALS missing or invalid")
+
+#     # Initialize Vertex AI
+#     vertexai.init(
+#         project="poc-script-genai",
+#         location="us-central1",
+#     )
+
+# @app.on_event("startup")
+# def startup_event():
+#     init_vertex()
+#     # Create model after Vertex is initialized
+#     global model
+#     model = GenerativeModel(
+#         "projects/poc-script-genai/locations/us-central1/endpoints/1201184567508074496"
+#     )
+
+# # Schemas
+# class ChatRequest(BaseModel):
+#     message: str
+
+
+# @app.get("/")
+# def root():
+#     return {"status": "bkl chalrha hai"}
+
+# # @app.get("/health")
+# # def health():
+# #     return {"status": "ok"}
+
+
+# @app.post("/chat")
+# def chat(req: ChatRequest):
+#     response=model.generate_content(req.message)  
+#     return {"reply": response.text}
+
+
+
+# SYSTEM_INSTRUCTIONS = """ 
+# Untill not asked to create/generate a script, you will act as a normal chatbot.
+# You are a content writer, when asked to create/generate a script, you will follow the structure below exactly, UNTILL then you are instructed otherwise.0
+# Based on the provided inputs, generate a complete script and all associated metadata. The output must follow the specified structure and format.
+
+# ## Output Format
+# A table in MarkDown format with three columns. 
+# Each table row MUST be on a new line.
+# Do NOT collapse multiple rows into a single line.
+# First column is Time in seconds, second column is Voice Over text, third column is Visuals description.
+# | Time (s) | Voice Over                                    | Visuals                                                                 |
+# | :------- | :---------------------------------------------- | :---------------------------------------------------------------------- |
+
+# ## Output Structure
+
+# ### Title
+# A compelling title for the video.
+
+# ### Description
+# A detailed description for the video platform (e.g., YouTube).
+
+# ### Details
+# - Video Length: Total length of the video in seconds.
+# - Word Count: Total number of words in the Voice Over.
+
+# ### Script
+# A 3-column Markdown table with the following headers: `Time (s)`, `Voice Over`, `Visuals`.
+
+
+
+# ## Constraints
+# - The `Time (s)` column must be in cumulative seconds.
+# - The `Voice Over` and `Visuals` columns should contain concise, clear sentences.
+
+# ## Example
+
+# ### Title
+# How to Brew the Perfect Pour-Over Coffee in Under 3 Minutes
+
+# ### Description
+# Learn the art of brewing the perfect pour-over coffee in just under 3 minutes! This step-by-step guide will walk you through the process, from selecting the right beans to mastering your pouring technique
+
+# ### Details
+# - Video Length: 180 seconds
+# - Word Count: 150 words
+
+# ### Script
+# | Time (s) | Voice Over                                    | Visuals                                                                 |
+# | :------- | :---------------------------------------------- | :---------------------------------------------------------------------- |
+
+# """
+
+# @app.post("/chat")
+# async def chat(
+#     prompt: str = Form(""),
+#     file: UploadFile | None = File(None)
+# ):
+#     parts = []
+#     parts.append(SYSTEM_INSTRUCTIONS)
+
+#     # ---------- PDF ----------
+#     if file and file.filename.lower().endswith(".pdf"):
+#         pdf_bytes = await file.read()
+#         reader = PdfReader(io.BytesIO(pdf_bytes))
+
+#         pdf_text = ""
+#         for page in reader.pages:
+#             if page.extract_text():
+#                 pdf_text += page.extract_text() + "\n"
+
+#         parts.append(f"""
+# DOCUMENT (PDF):
+# {pdf_text}
+
+# USER TASK:
+# {prompt}
+# """)
+
+#     # ---------- IMAGE ----------
+#     elif file and file.filename.lower().endswith((".png", ".jpg", ".jpeg")):
+#         image_bytes = await file.read()
+#         parts.append(Part.from_data(image_bytes, mime_type=file.content_type))
+#         parts.append(prompt)
+
+#     # ---------- VIDEO ----------
+#     elif file and file.filename.lower().endswith(".mp4"):
+#         video_bytes = await file.read()
+#         parts.append(
+#             Part.from_data(video_bytes, mime_type="video/mp4")
+#         )
+#         parts.append(prompt)
+
+#     # ---------- TEXT ----------
+#     elif file and file.filename.lower().endswith(".txt"):
+#         text_bytes = await file.read()
+#         text_content = text_bytes.decode("utf-8", errors="ignore")
+
+#         parts.append(f"""
+# DOCUMENT (TEXT):
+# {text_content}
+
+# USER TASK:
+# {prompt}
+# """)
+
+#     # ---------- CSV ----------
+#     elif file and file.filename.lower().endswith(".csv"):
+#         csv_bytes = await file.read()
+#         decoded = csv_bytes.decode("utf-8", errors="ignore")
+
+#         reader = csv.reader(io.StringIO(decoded))
+#         csv_text = "\n".join([", ".join(row) for row in reader])
+
+#         parts.append(f"""
+# DOCUMENT (CSV):
+# {csv_text}
+
+# USER TASK:
+# {prompt}
+# """)
+
+#     # ---------- DOCX ----------
+#     elif file and file.filename.lower().endswith(".docx"):
+#         doc_bytes = await file.read()
+#         doc = Document(io.BytesIO(doc_bytes))
+
+#         doc_text = "\n".join([para.text for para in doc.paragraphs])
+
+#         parts.append(f"""
+# DOCUMENT (DOCX):
+# {doc_text}
+
+# USER TASK:
+# {prompt}
+# """)
+
+#     # ---------- XLSX ----------
+#     elif file and file.filename.lower().endswith(".xlsx"):
+#         xlsx_bytes = await file.read()
+#         wb = load_workbook(io.BytesIO(xlsx_bytes), data_only=True)
+
+#         excel_text = ""
+#         for sheet in wb:
+#             excel_text += f"\nSHEET: {sheet.title}\n"
+#             for row in sheet.iter_rows(values_only=True):
+#                 excel_text += ", ".join([str(cell) if cell else "" for cell in row]) + "\n"
+
+#         parts.append(f"""
+# DOCUMENT (EXCEL):
+# {excel_text}
+
+# USER TASK:
+# {prompt}
+# """)
+
+#     # ---------- PPTX ----------
+#     elif file and file.filename.lower().endswith(".pptx"):
+#         ppt_bytes = await file.read()
+#         prs = Presentation(io.BytesIO(ppt_bytes))
+
+#         ppt_text = ""
+#         for slide in prs.slides:
+#             for shape in slide.shapes:
+#                 if hasattr(shape, "text"):
+#                     ppt_text += shape.text + "\n"
+
+#         parts.append(f"""
+# DOCUMENT (PRESENTATION):
+# {ppt_text}
+
+# USER TASK:
+# {prompt}
+# """)
+
+#     # ---------- TEXT ONLY ----------
+#     else:
+#         parts.append(prompt)
+
+
+#     # response = model.generate_content(parts)
+#     # return {"reply": response.text}
+#     final_text = ""
+
+#     stream = model.generate_content(
+#         parts,
+#         stream=True
+#     )
+
+#     for response in stream:
+#         if not response.candidates:
+#             continue
+
+#         candidate = response.candidates[0]
+
+#         if not candidate.content or not candidate.content.parts:
+#             continue
+
+#         for part in candidate.content.parts:
+#             if hasattr(part, "text") and part.text:
+#                 final_text += part.text
+
+#     def sanitize_output(text: str) -> str:
+#         replacements = {
+#             "###": "",
+#             "***": "",
+#             "**": "",
+#         }
+#         for k, v in replacements.items():
+#             text = text.replace(k, v)
+#         return text.strip()
+
+#     def normalize_markdown_table(text: str) -> str:
+#         """
+#         Converts pipe-collapsed markdown into a proper row-based markdown table.
+#         """
+
+#         # Remove accidental double pipes and trim
+#         text = text.replace("||", "|").replace("**", "").strip()
+
+#         # Split by pipe and clean cells
+#         cells = [c.strip() for c in text.split("||") if c.strip()]
+
+#         # Expected columns: 3
+#         cols = 3
+
+#         # If not divisible, return original text
+#         if len(cells) < cols:
+#             return text
+
+#         rows = [cells[i:i+cols] for i in range(0, len(cells), cols)]
+
+#         # Build markdown table
+#         table = []
+#         table.append(f"| {rows[0][0]} | {rows[0][1]} | {rows[0][2]} |")
+#         table.append("| :------- | :--------- | :--------- |")
+
+#         for row in rows[1:]:
+#             if len(row) == cols:
+#                 table.append(f"| {row[0]} | {row[1]} | {row[2]} |")
+
+#         return "\n".join(table)
+
+#     # ✅ POST-PROCESSING PIPELINE
+#     clean_text = sanitize_output(final_text)
+#     markdown_table = normalize_markdown_table(clean_text)
+#     return {"reply": markdown_table}
+
+
+
+
+
+
+import os
+import io
+import csv
+import json
+import base64
+import tempfile
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from pypdf import PdfReader
+from docx import Document
+from openpyxl import load_workbook
+from pptx import Presentation
+
+import vertexai
+from vertexai.generative_models import GenerativeModel, Part
+
+# --------------------------------------------------
+# APP
+# --------------------------------------------------
 app = FastAPI()
 
+# --------------------------------------------------
+# ✅ CORS — THIS IS THE IMPORTANT FIX
+# --------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"https://.*\.vercel\.app",
@@ -59,309 +401,147 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
+# --------------------------------------------------
+# VERTEX INIT (SAFE)
+# --------------------------------------------------
+model: GenerativeModel | None = None
 
 def init_vertex():
-    # 1. Prefer base64-encoded service account in VERTEX_SERVICE_ACCOUNT_BASE64
+    """
+    Initializes Vertex AI.
+    Will NOT crash the app if env vars are missing (prevents CORS break).
+    """
     key_b64 = os.environ.get("VERTEX_SERVICE_ACCOUNT_BASE64")
-    if key_b64:
-        creds_json = base64.b64decode(key_b64).decode("utf-8")
-        creds = json.loads(creds_json)
 
-        # Write to temp file (Vertex requires a file)
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-            json.dump(creds, f)
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
-    else:
-        # Fallback: allow GOOGLE_APPLICATION_CREDENTIALS to be set directly
-        gpath = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        if not gpath or not os.path.exists(gpath):
-            raise RuntimeError("VERTEX_SERVICE_ACCOUNT_BASE64 not set and GOOGLE_APPLICATION_CREDENTIALS missing or invalid")
+    if not key_b64:
+        print("⚠️ VERTEX_SERVICE_ACCOUNT_BASE64 not set — skipping Vertex init")
+        return None
 
-    # Initialize Vertex AI
+    creds_json = base64.b64decode(key_b64).decode("utf-8")
+    creds = json.loads(creds_json)
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+        json.dump(creds, f)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
+
     vertexai.init(
         project="poc-script-genai",
         location="us-central1",
     )
 
-@app.on_event("startup")
-def startup_event():
-    init_vertex()
-    # Create model after Vertex is initialized
-    global model
-    model = GenerativeModel(
+    return GenerativeModel(
         "projects/poc-script-genai/locations/us-central1/endpoints/1201184567508074496"
     )
 
-# Schemas
-class ChatRequest(BaseModel):
-    message: str
+@app.on_event("startup")
+def startup():
+    global model
+    model = init_vertex()
 
-
+# --------------------------------------------------
+# HEALTH
+# --------------------------------------------------
 @app.get("/")
 def root():
-    return {"status": "bkl chalrha hai"}
+    return {"status": "ok"}
 
-# @app.get("/health")
-# def health():
-#     return {"status": "ok"}
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
 
+# --------------------------------------------------
+# SYSTEM PROMPT
+# --------------------------------------------------
+SYSTEM_INSTRUCTIONS = """
+Until asked to generate a script, behave as a normal chatbot.
 
-@app.post("/chat")
-def chat(req: ChatRequest):
-    response=model.generate_content(req.message)  
-    return {"reply": response.text}
-
-
-
-SYSTEM_INSTRUCTIONS = """ 
-Untill not asked to create/generate a script, you will act as a normal chatbot.
-You are a content writer, when asked to create/generate a script, you will follow the structure below exactly, UNTILL then you are instructed otherwise.0
-Based on the provided inputs, generate a complete script and all associated metadata. The output must follow the specified structure and format.
-
-## Output Format
-A table in MarkDown format with three columns. 
-Each table row MUST be on a new line.
-Do NOT collapse multiple rows into a single line.
-First column is Time in seconds, second column is Voice Over text, third column is Visuals description.
-| Time (s) | Voice Over                                    | Visuals                                                                 |
-| :------- | :---------------------------------------------- | :---------------------------------------------------------------------- |
-
-## Output Structure
-
-### Title
-A compelling title for the video.
-
-### Description
-A detailed description for the video platform (e.g., YouTube).
-
-### Details
-- Video Length: Total length of the video in seconds.
-- Word Count: Total number of words in the Voice Over.
-
-### Script
-A 3-column Markdown table with the following headers: `Time (s)`, `Voice Over`, `Visuals`.
-
-
-
-## Constraints
-- The `Time (s)` column must be in cumulative seconds.
-- The `Voice Over` and `Visuals` columns should contain concise, clear sentences.
-
-## Example
-
-### Title
-How to Brew the Perfect Pour-Over Coffee in Under 3 Minutes
-
-### Description
-Learn the art of brewing the perfect pour-over coffee in just under 3 minutes! This step-by-step guide will walk you through the process, from selecting the right beans to mastering your pouring technique
-
-### Details
-- Video Length: 180 seconds
-- Word Count: 150 words
-
-### Script
-| Time (s) | Voice Over                                    | Visuals                                                                 |
-| :------- | :---------------------------------------------- | :---------------------------------------------------------------------- |
-
+When asked to generate a script, output:
+- Title
+- Description
+- Details
+- Markdown table with Time / Voice Over / Visuals
 """
 
+# --------------------------------------------------
+# CHAT ENDPOINT
+# --------------------------------------------------
 @app.post("/chat")
 async def chat(
     prompt: str = Form(""),
-    file: UploadFile | None = File(None)
+    file: UploadFile | None = File(None),
 ):
-    parts = []
-    parts.append(SYSTEM_INSTRUCTIONS)
+    if not model:
+        return {"reply": "❌ Vertex AI not initialized (credentials missing)."}
 
-    # ---------- PDF ----------
-    if file and file.filename.lower().endswith(".pdf"):
-        pdf_bytes = await file.read()
-        reader = PdfReader(io.BytesIO(pdf_bytes))
+    parts: list = [SYSTEM_INSTRUCTIONS]
 
-        pdf_text = ""
-        for page in reader.pages:
-            if page.extract_text():
-                pdf_text += page.extract_text() + "\n"
+    if file:
+        name = file.filename.lower()
+        data = await file.read()
 
-        parts.append(f"""
-DOCUMENT (PDF):
-{pdf_text}
+        if name.endswith(".pdf"):
+            reader = PdfReader(io.BytesIO(data))
+            text = "\n".join(
+                p.extract_text() or "" for p in reader.pages
+            )
+            parts.append(f"DOCUMENT:\n{text}\n\nTASK:\n{prompt}")
 
-USER TASK:
-{prompt}
-""")
+        elif name.endswith((".png", ".jpg", ".jpeg")):
+            parts.append(Part.from_data(data, mime_type=file.content_type))
+            parts.append(prompt)
 
-    # ---------- IMAGE ----------
-    elif file and file.filename.lower().endswith((".png", ".jpg", ".jpeg")):
-        image_bytes = await file.read()
-        parts.append(Part.from_data(image_bytes, mime_type=file.content_type))
-        parts.append(prompt)
+        elif name.endswith(".txt"):
+            parts.append(data.decode(errors="ignore"))
+            parts.append(prompt)
 
-    # ---------- VIDEO ----------
-    elif file and file.filename.lower().endswith(".mp4"):
-        video_bytes = await file.read()
-        parts.append(
-            Part.from_data(video_bytes, mime_type="video/mp4")
-        )
-        parts.append(prompt)
+        elif name.endswith(".csv"):
+            decoded = data.decode(errors="ignore")
+            reader = csv.reader(io.StringIO(decoded))
+            text = "\n".join(", ".join(r) for r in reader)
+            parts.append(text)
+            parts.append(prompt)
 
-    # ---------- TEXT ----------
-    elif file and file.filename.lower().endswith(".txt"):
-        text_bytes = await file.read()
-        text_content = text_bytes.decode("utf-8", errors="ignore")
+        elif name.endswith(".docx"):
+            doc = Document(io.BytesIO(data))
+            parts.append("\n".join(p.text for p in doc.paragraphs))
+            parts.append(prompt)
 
-        parts.append(f"""
-DOCUMENT (TEXT):
-{text_content}
+        elif name.endswith(".xlsx"):
+            wb = load_workbook(io.BytesIO(data), data_only=True)
+            text = ""
+            for s in wb:
+                for r in s.iter_rows(values_only=True):
+                    text += ", ".join(str(c or "") for c in r) + "\n"
+            parts.append(text)
+            parts.append(prompt)
 
-USER TASK:
-{prompt}
-""")
+        elif name.endswith(".pptx"):
+            prs = Presentation(io.BytesIO(data))
+            text = ""
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        text += shape.text + "\n"
+            parts.append(text)
+            parts.append(prompt)
 
-    # ---------- CSV ----------
-    elif file and file.filename.lower().endswith(".csv"):
-        csv_bytes = await file.read()
-        decoded = csv_bytes.decode("utf-8", errors="ignore")
+        else:
+            parts.append(prompt)
 
-        reader = csv.reader(io.StringIO(decoded))
-        csv_text = "\n".join([", ".join(row) for row in reader])
-
-        parts.append(f"""
-DOCUMENT (CSV):
-{csv_text}
-
-USER TASK:
-{prompt}
-""")
-
-    # ---------- DOCX ----------
-    elif file and file.filename.lower().endswith(".docx"):
-        doc_bytes = await file.read()
-        doc = Document(io.BytesIO(doc_bytes))
-
-        doc_text = "\n".join([para.text for para in doc.paragraphs])
-
-        parts.append(f"""
-DOCUMENT (DOCX):
-{doc_text}
-
-USER TASK:
-{prompt}
-""")
-
-    # ---------- XLSX ----------
-    elif file and file.filename.lower().endswith(".xlsx"):
-        xlsx_bytes = await file.read()
-        wb = load_workbook(io.BytesIO(xlsx_bytes), data_only=True)
-
-        excel_text = ""
-        for sheet in wb:
-            excel_text += f"\nSHEET: {sheet.title}\n"
-            for row in sheet.iter_rows(values_only=True):
-                excel_text += ", ".join([str(cell) if cell else "" for cell in row]) + "\n"
-
-        parts.append(f"""
-DOCUMENT (EXCEL):
-{excel_text}
-
-USER TASK:
-{prompt}
-""")
-
-    # ---------- PPTX ----------
-    elif file and file.filename.lower().endswith(".pptx"):
-        ppt_bytes = await file.read()
-        prs = Presentation(io.BytesIO(ppt_bytes))
-
-        ppt_text = ""
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                if hasattr(shape, "text"):
-                    ppt_text += shape.text + "\n"
-
-        parts.append(f"""
-DOCUMENT (PRESENTATION):
-{ppt_text}
-
-USER TASK:
-{prompt}
-""")
-
-    # ---------- TEXT ONLY ----------
     else:
         parts.append(prompt)
 
+    # --------------------------------------------------
+    # STREAM RESPONSE
+    # --------------------------------------------------
+    final = ""
+    stream = model.generate_content(parts, stream=True)
 
-    # response = model.generate_content(parts)
-    # return {"reply": response.text}
-    final_text = ""
-
-    stream = model.generate_content(
-        parts,
-        stream=True
-    )
-
-    for response in stream:
-        if not response.candidates:
+    for r in stream:
+        if not r.candidates:
             continue
+        for p in r.candidates[0].content.parts:
+            if hasattr(p, "text"):
+                final += p.text
 
-        candidate = response.candidates[0]
-
-        if not candidate.content or not candidate.content.parts:
-            continue
-
-        for part in candidate.content.parts:
-            if hasattr(part, "text") and part.text:
-                final_text += part.text
-
-    def sanitize_output(text: str) -> str:
-        replacements = {
-            "###": "",
-            "***": "",
-            "**": "",
-        }
-        for k, v in replacements.items():
-            text = text.replace(k, v)
-        return text.strip()
-
-    def normalize_markdown_table(text: str) -> str:
-        """
-        Converts pipe-collapsed markdown into a proper row-based markdown table.
-        """
-
-        # Remove accidental double pipes and trim
-        text = text.replace("||", "|").replace("**", "").strip()
-
-        # Split by pipe and clean cells
-        cells = [c.strip() for c in text.split("||") if c.strip()]
-
-        # Expected columns: 3
-        cols = 3
-
-        # If not divisible, return original text
-        if len(cells) < cols:
-            return text
-
-        rows = [cells[i:i+cols] for i in range(0, len(cells), cols)]
-
-        # Build markdown table
-        table = []
-        table.append(f"| {rows[0][0]} | {rows[0][1]} | {rows[0][2]} |")
-        table.append("| :------- | :--------- | :--------- |")
-
-        for row in rows[1:]:
-            if len(row) == cols:
-                table.append(f"| {row[0]} | {row[1]} | {row[2]} |")
-
-        return "\n".join(table)
-
-    # ✅ POST-PROCESSING PIPELINE
-    clean_text = sanitize_output(final_text)
-    markdown_table = normalize_markdown_table(clean_text)
-    return {"reply": markdown_table}
-
-
-
-
+    return {"reply": final.strip()}
