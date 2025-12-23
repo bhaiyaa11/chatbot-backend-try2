@@ -32,22 +32,33 @@ from vertexai.generative_models import (
     Part,
 )
 
+# app = FastAPI()
+
+# # CORS React frontend support
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=[
+#         r"https://.*\.vercel\.app",
+#         "https://chatbot-ks9sf9w5k-bhavyas-projects-bad1561c.vercel.app",       
+#         "https://chatbot-aim.vercel.app",
+#         "http://localhost:5173",
+#         # "http://127.0.0.1:5173",
+#     ],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
 app = FastAPI()
 
-# CORS React frontend support
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        r"https://.*\.vercel\.app",
-        "https://chatbot-ks9sf9w5k-bhavyas-projects-bad1561c.vercel.app",       
-        "https://chatbot-aim.vercel.app",
-        "http://localhost:5173",
-        # "http://127.0.0.1:5173",
-    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 
