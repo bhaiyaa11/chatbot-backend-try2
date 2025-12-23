@@ -27,26 +27,26 @@ import io
 from pydantic import BaseModel
 
 import vertexai
-from vertexai.generative_models import GenerativeModel
 from vertexai.generative_models import (
     GenerativeModel,
     Part,
 )
-# from google.generativeai.types import Part
-
-
-# Initialize Vertex AI ONCE (startup time)
-# vertexai.init(
-#     project="poc-script-genai",
-#     location="us-central1",
-# )
-
-# model = GenerativeModel(
-#     "projects/poc-script-genai/locations/us-central1/endpoints/1201184567508074496"
-# )
-
 
 app = FastAPI()
+
+# CORS React frontend support
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://chatbot-aim.vercel.app",
+        # "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 def init_vertex():
     # 1. Prefer base64-encoded service account in VERTEX_SERVICE_ACCOUNT_BASE64
@@ -80,20 +80,6 @@ def startup_event():
         "projects/poc-script-genai/locations/us-central1/endpoints/1201184567508074496"
     )
 
-
-# CORS React frontend support
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "chatbot-aim.vercel.app",
-        # "http://127.0.0.1:5173",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
 # Schemas
 class ChatRequest(BaseModel):
     message: str
@@ -108,10 +94,10 @@ def health():
     return {"status": "ok"}
 
 
-# @app.post("/chat")
-# def chat(req: ChatRequest):
-#     response=model.generate_content(req.message)  
-#     return {"reply": response.text}
+@app.post("/chat")
+def chat(req: ChatRequest):
+    response=model.generate_content(req.message)  
+    return {"reply": response.text}
 
 
 
