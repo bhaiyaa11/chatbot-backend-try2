@@ -323,7 +323,7 @@ async def _vertex_search(query: str, page_size: int = 5) -> list:
 # PHASE 1 — Project Intelligence (Tavily web search)
 # ==================================================
 
-async def _extract_project_intelligence(metadata: dict) -> tuple:
+async def _extract_project_intelligence(metadata: dict ,file_parts: list = None) -> tuple:
     prompt_text   = metadata.get("prompt", "")
     client        = metadata.get("client", "")
     business_unit = metadata.get("business_unit", "")

@@ -44,9 +44,9 @@ async def run_pipeline(
     - Just improve it based on the instruction
     """
 
-        from pipeline.llm_client import llm_generate  # adjust if different
+        # from pipeline.llm_client import llm_generate  # adjust if different
 
-        refined = await llm_generate(edit_prompt)
+        refined = await edit_prompt
 
         yield f"result:{refined}\n"
         return
