@@ -708,8 +708,8 @@ async def edit(
     selected_text: str = Form(...),
 ):
     try:
-        from google import genai
-        client = genai.Client(vertexai=True, project="poc-script-genai", location=STAGE_LOCATIONS.get("CRITIC", "global"))
+        from config import get_genai_client
+        client = get_genai_client(location=STAGE_LOCATIONS.get("CRITIC", "global"))
         prompt = f"{_EDIT_SYSTEM_PROMPT}\n\nInstruction: {instruction}\n\nText:\n{selected_text}"
         response = await client.aio.models.generate_content(
             model="projects/poc-script-genai/locations/global/publishers/google/models/gemini-3-flash-preview",

@@ -199,7 +199,8 @@ Output STRICTLY as JSON — no markdown fences, no extra keys:
 # ==================================================
 
 def _get_client_and_model():
-    client = genai.Client(vertexai=True, project="poc-script-genai", location="global")
+    from config import get_genai_client
+    client = get_genai_client(location="global")
     return client, WORKING_MODEL
 
 

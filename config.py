@@ -305,15 +305,21 @@ STAGE_LOCATIONS = {
     "CRITIC":     "global",
 }
 
-def init_vertex():
-    key_b64  = os.environ.get("VERTEX_SERVICE_ACCOUNT_BASE64")
-    key_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+def get_genai_client(location: str = "us-central1"):
+    from google import genai
+    from google.oauth2 import service_account
 
-    if key_b64:
-        creds_json = base64.b64decode(key_b64).decode()
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            f.write(creds_json)
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
-
-    elif not (key_path and os.path.exists(key_path)):
-        raise RuntimeError("❌ Vertex credentials not found")
+    creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+    if creds_json:
+        info = json.loads(creds_json)
+        credentials = service_account.Credentials.from_service_account_info(info)
+        project_id = info.get("project_id", "poc-script-genai")
+        return genai.Client(
+            vertexai=True,
+            project=project_id,
+            location=location,
+            credentials=credentials
+        )
+    
+    # Fallback to local default Application Default Credentials
+    return genai.Client(vertexai=True, project="poc-script-genai", location=location)

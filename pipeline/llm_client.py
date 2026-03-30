@@ -7,7 +7,7 @@
 
 import json, time, asyncio, logging, random
 from google import genai
-from config import MODEL_ENDPOINTS, MAX_RETRIES
+from config import MODEL_ENDPOINTS, MAX_RETRIES, get_genai_client
 from pipeline.cache import cache
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ _STAGE_LOCATIONS = {
 
 def _get_client_and_model(stage: str, endpoint: str):
     location = _STAGE_LOCATIONS.get(stage, "us-central1")
-    client = genai.Client(vertexai=True, project="poc-script-genai", location=location)
+    client = get_genai_client(location=location)
     return client, endpoint
 
 
