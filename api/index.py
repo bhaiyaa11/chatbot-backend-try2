@@ -539,14 +539,12 @@ from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, APIRouter, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
-from config import init_vertex, STAGE_LOCATIONS
+from config import STAGE_LOCATIONS
 from ingest.file_parser import parse_files
 from pipeline.orchestrator import run_pipeline
 from supabase import create_client
 from dotenv import load_dotenv
 from pipeline.fine_tune import export_training_jsonl, trigger_fine_tune_job
-import vertexai
-from vertexai.generative_models import GenerativeModel
 import os
 from pipeline.stages.niche_research import NicheResearchStage
 load_dotenv()
@@ -588,7 +586,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    init_vertex()
+    # init_vertex()
     logger.info("✅ Vertex AI initialized")
 
 @app.get("/health")
@@ -710,12 +708,13 @@ async def edit(
     selected_text: str = Form(...),
 ):
     try:
-        vertexai.init(project="poc-script-genai", location=STAGE_LOCATIONS.get("CRITIC", "global"))
-        model = GenerativeModel(
-            "projects/poc-script-genai/locations/global/publishers/google/models/gemini-3-flash-preview"
-        )
+        from google import genai
+        client = genai.Client(vertexai=True, project="poc-script-genai", location=STAGE_LOCATIONS.get("CRITIC", "global"))
         prompt = f"{_EDIT_SYSTEM_PROMPT}\n\nInstruction: {instruction}\n\nText:\n{selected_text}"
-        response = await model.generate_content_async(prompt)
+        response = await client.aio.models.generate_content(
+            model="projects/poc-script-genai/locations/global/publishers/google/models/gemini-3-flash-preview",
+            contents=prompt
+        )
         return JSONResponse({"result": response.text.strip()})
     except Exception as e:
         logger.error(f"[/edit] Error: {e}")

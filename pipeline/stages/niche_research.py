@@ -12,8 +12,7 @@ from youtube_transcript_api import YouTubeTranscriptApi
 
 from pipeline.contracts import StageResult
 
-import vertexai
-from vertexai.generative_models import GenerativeModel
+from google import genai
 
 logger = logging.getLogger(__name__)
 
@@ -199,15 +198,18 @@ Output STRICTLY as JSON — no markdown fences, no extra keys:
 # Gemini helpers
 # ==================================================
 
-def _get_model() -> GenerativeModel:
-    vertexai.init(project="poc-script-genai", location="global")
-    return GenerativeModel(WORKING_MODEL)
+def _get_client_and_model():
+    client = genai.Client(vertexai=True, project="poc-script-genai", location="global")
+    return client, WORKING_MODEL
 
 
 async def _call_model(prompt: str) -> str:
     async with SEMAPHORE:
-        model = _get_model()
-        response = await model.generate_content_async(prompt)
+        client, model_id = _get_client_and_model()
+        response = await client.aio.models.generate_content(
+            model=model_id,
+            contents=prompt
+        )
         return response.text or ""
 
 

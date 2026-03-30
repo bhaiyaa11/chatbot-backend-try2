@@ -2,7 +2,6 @@ import json
 import os
 import asyncio
 import logging
-import vertexai
 from google.cloud import aiplatform
 from supabase import create_client
 from dotenv import load_dotenv

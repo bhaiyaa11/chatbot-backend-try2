@@ -153,7 +153,6 @@
 
 
 import os, base64, json, tempfile
-import vertexai
 
 SYSTEM_PROMPTS = {
 
@@ -262,11 +261,11 @@ RULES:
 
 MODEL_ENDPOINTS = {
     "VOICE_OVER": [
-        "projects/poc-script-genai/locations/us-central1/endpoints/5460226420582121472",
+        "projects/poc-script-genai/locations/us-central1/endpoints/7288249713910874112",
         "gemini-2.5-flash-lite",
     ],
     "VISUALS": [
-        "projects/poc-script-genai/locations/us-central1/endpoints/2803102640433528832",
+        "projects/poc-script-genai/locations/us-central1/endpoints/1333928056573657088",
         "gemini-2.5-flash-lite",
     ],
     "CRITIC": [
@@ -318,5 +317,3 @@ def init_vertex():
 
     elif not (key_path and os.path.exists(key_path)):
         raise RuntimeError("❌ Vertex credentials not found")
-
-    vertexai.init(project="poc-script-genai", location="us-central1")

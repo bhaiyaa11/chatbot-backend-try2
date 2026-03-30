@@ -6,8 +6,7 @@
 
 
 import json, time, asyncio, logging, random
-import vertexai
-from vertexai.generative_models import GenerativeModel
+from google import genai
 from config import MODEL_ENDPOINTS, MAX_RETRIES
 from pipeline.cache import cache
 
@@ -22,10 +21,10 @@ _STAGE_LOCATIONS = {
     "CRITIC":     "global",
 }
 
-def _get_model(stage: str, endpoint: str) -> GenerativeModel:
+def _get_client_and_model(stage: str, endpoint: str):
     location = _STAGE_LOCATIONS.get(stage, "us-central1")
-    vertexai.init(project="poc-script-genai", location=location)
-    return GenerativeModel(endpoint)
+    client = genai.Client(vertexai=True, project="poc-script-genai", location=location)
+    return client, endpoint
 
 
 def _parse_json_response(text: str) -> dict:
@@ -61,7 +60,7 @@ async def call_llm(stage: str, contents: list) -> tuple[dict, int, bool]:
     total_attempts = 0
 
     for endpoint_idx, endpoint in enumerate(endpoints):
-        model = _get_model(stage, endpoint)
+        client, model_id = _get_client_and_model(stage, endpoint)
         is_fallback = endpoint_idx > 0
 
         if is_fallback:
@@ -70,7 +69,10 @@ async def call_llm(stage: str, contents: list) -> tuple[dict, int, bool]:
         for attempt in range(1, MAX_RETRIES + 1):
             total_attempts += 1
             try:
-                response = await model.generate_content_async(contents)
+                response = await client.aio.models.generate_content(
+                    model=model_id,
+                    contents=contents
+                )
                 parsed = _parse_json_response(response.text or "")
 
                 # ── Store in cache on success ─────────────────
@@ -118,9 +120,12 @@ async def stream_llm(stage: str, contents: list):
     endpoints = MODEL_ENDPOINTS[stage]
 
     for endpoint in endpoints:
-        model = _get_model(stage, endpoint)
+        client, model_id = _get_client_and_model(stage, endpoint)
         try:
-            stream = await model.generate_content_async(contents, stream=True)
+            stream = await client.aio.models.generate_content_stream(
+                model=model_id,
+                contents=contents
+            )
             async for chunk in stream:
                 if chunk.text:
                     yield chunk.text

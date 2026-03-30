@@ -241,7 +241,7 @@ from pypdf import PdfReader
 from docx import Document
 from openpyxl import load_workbook
 from pptx import Presentation
-from vertexai.generative_models import Part
+from google.genai import types
 
 from config import TOKEN_BUDGETS
 
@@ -329,7 +329,7 @@ async def parse_files(files: list[UploadFile], stage: str = "VOICE_OVER") -> lis
         r for r in flat_results if isinstance(r, str) and r.strip()
     ]
 
-    media_parts: list[Part] = [
+    media_parts: list[types.Part] = [
         r for r in flat_results if not isinstance(r, str) and r is not None
     ]
 
@@ -344,7 +344,7 @@ async def parse_files(files: list[UploadFile], stage: str = "VOICE_OVER") -> lis
 # Router
 # ───────────────────────────────────────────────────────────────
 
-async def _parse_one(file: UploadFile) -> Union[str, Part, list, None]:
+async def _parse_one(file: UploadFile) -> Union[str, types.Part, list, None]:
     name = (file.filename or "").lower()
     data = await file.read()
 
@@ -368,13 +368,13 @@ async def _parse_one(file: UploadFile) -> Union[str, Part, list, None]:
             return data.decode(errors="ignore")
 
         if name.endswith((".png", ".jpg", ".jpeg", ".webp")):
-            return Part.from_data(
+            return types.Part.from_bytes(
                 data=data,
                 mime_type=file.content_type or "image/png",
             )
 
         if name.endswith((".mp4", ".mov", ".webm", ".mkv")):
-            return Part.from_data(
+            return types.Part.from_bytes(
                 data=data,
                 mime_type=file.content_type or "video/mp4",
             )
@@ -391,7 +391,7 @@ async def _parse_one(file: UploadFile) -> Union[str, Part, list, None]:
 # PDF parser (FUNCTIONALITY UNCHANGED)
 # ───────────────────────────────────────────────────────────────
 
-def _pdf(data: bytes) -> Union[str, list[Part]]:
+def _pdf(data: bytes) -> Union[str, list[types.Part]]:
     """
     Smart PDF parser:
 
@@ -427,14 +427,14 @@ def _pdf(data: bytes) -> Union[str, list[Part]]:
         last_page=min(5, len(reader.pages)),
     )
 
-    parts: list[Part] = []
+    parts: list[types.Part] = []
 
     for img in images:
         buffer = io.BytesIO()
         img.save(buffer, format="PNG")
 
         parts.append(
-            Part.from_data(
+            types.Part.from_bytes(
                 data=buffer.getvalue(),
                 mime_type="image/png",
             )
