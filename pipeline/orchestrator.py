@@ -5,6 +5,7 @@ from pipeline.stages.visuals import VisualsStage
 from pipeline.stages.critic import CriticStage
 from pipeline.contracts import StageResult
 from config import PIPELINE_TIMEOUT_SECONDS
+from pipeline.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -23,33 +24,41 @@ async def run_pipeline(
     research_brief: dict = None,   # ← structured brief from NicheResearchStage
     mode: str = "generate",  # "generate" | "edit"
     existing_script: str = None,
+    preferences: dict = None,
 ) -> AsyncGenerator[str, None]:
     
+
     # ── EDIT MODE (THIS IS THE FIX) ─────────────────────────────
     if mode == "edit" and existing_script:
         yield "status:Refining existing script...\n"
 
+        from pipeline.llm_client import stream_llm
+        
         edit_prompt = f"""
-    You are an expert script editor.
+You are an expert script editor.
 
-    EXISTING SCRIPT:
-    {existing_script}
+EXISTING SCRIPT:
+{existing_script}
 
-    INSTRUCTION:
-    {prompt}
+INSTRUCTION:
+{prompt}
 
-    Rewrite the SAME script.
-    - Keep the same structure
-    - Do NOT create a new concept
-    - Just improve it based on the instruction
-    """
+Rewrite the SAME script while applying the instruction.
+If the existing script is a markdown table, maintain the table format.
+Do NOT create a new concept. Just improve it.
+"""
 
-        # from pipeline.llm_client import llm_generate  # adjust if different
+        from pipeline.llm_client import generate_text
 
-        refined = await edit_prompt
+        result = await generate_text("CRITIC", [edit_prompt])
 
-        yield f"result:{refined}\n"
+        if not result.strip():
+            yield "error:Edit returned empty response\n"
+            return
+
+        yield f"result:{result}\n"
         return
+        # return
 
     # Build metadata dict — passed to all stages for context
     metadata = {
@@ -67,7 +76,8 @@ async def run_pipeline(
         prompt=prompt,
         file_parts=file_parts,
         metadata=metadata,
-        research_brief=research_brief,   # ← injected here
+        research_brief=research_brief,
+        preferences=preferences,
     )
     trace.append(r1.model_dump(exclude={"data"}))
     if not r1.success:

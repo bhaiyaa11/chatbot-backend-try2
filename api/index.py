@@ -558,6 +558,27 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _research_cache: dict = {}
 _script_cache: dict = {}
+_sessions: dict = {}
+
+def get_session(session_id: str):
+    if session_id not in _sessions:
+        _sessions[session_id] = {
+            "current_script": None,
+            "preferences": {},
+            "history": []
+        }
+    return _sessions[session_id]
+
+def detect_intent(prompt: str):
+    p = prompt.lower()
+    EDIT_KEYWORDS = [
+        "make it", "rewrite", "improve", "change",
+        "refine", "enhance", "shorten", "expand"
+    ]
+    if any(k in p for k in EDIT_KEYWORDS):
+        return "edit"
+    return "generate"
+
 # Global fallback for latest script so the frontend doesn't need to send it
 LAST_SCRIPT = None
 LAST_SCRIPT_ID = None
@@ -609,6 +630,7 @@ async def chat(
     research_brief: str = Form(""),   # fallback: raw JSON string (may be truncated)
     script_id: str = Form(""),
     mode: str = Form("generate"),
+    session_id: str = Form("default"),
     files: Optional[List[UploadFile]] = File(None),
 ):
     trace_id = str(uuid.uuid4())[:8]
@@ -628,28 +650,36 @@ async def chat(
 
     global LAST_SCRIPT, LAST_SCRIPT_ID
     
-    # ── AUTO-DETECT EDIT INTENT ──────────────────────────────
-    EDIT_KEYWORDS = [
-        "make it", "improve", "rewrite", "change tone",
-        "make it more", "refine", "enhance"
-    ]
-    is_edit_intent = any(keyword in prompt.lower() for keyword in EDIT_KEYWORDS)
+    session = get_session(session_id)
     
-    if is_edit_intent and LAST_SCRIPT:
+    # ── AUTO-DETECT INTENT ──────────────────────────────────
+    intent = detect_intent(prompt)
+    if intent == "edit":
         mode = "edit"
-        existing_script = LAST_SCRIPT
-        logger.info(f"[{trace_id}] Auto-detected edit intent. Using LAST_SCRIPT.")
-    else:
-        # Resolve script — prefer cache lookup
-        existing_script = None
-        if mode == "edit" and script_id and script_id in _script_cache:
-            existing_script = _script_cache[script_id]
-            logger.info(f"[{trace_id}] Loaded script from cache (id={script_id})")
+    
+    # ── SOFT PREFERENCE EXTRACTION ─────────────────────────
+    p = prompt.lower()
+    if "human" in p:
+        session["preferences"]["tone"] = "human"
+    if "short" in p:
+        session["preferences"]["length"] = "short"
+    if "story" in p:
+        session["preferences"]["style"] = "storytelling"
+
+    # ── RESOLVE EXISTING SCRIPT ─────────────────────────────
+    existing_script = None
+    if mode == "edit":
+        # Prioritize session, then LAST_SCRIPT, then cache
+        existing_script = session["current_script"] or LAST_SCRIPT
         
-        # Safe fallback if edit requested but no script available
-        if mode == "edit" and not existing_script:
+        if not existing_script and script_id and script_id in _script_cache:
+            existing_script = _script_cache[script_id]
+            
+        if existing_script:
+            logger.info(f"[{trace_id}] Context found for edit.")
+        else:
             mode = "generate"
-            logger.warning(f"[{trace_id}] Edit mode requested but no script found. Falling back to generate.")
+            logger.warning(f"[{trace_id}] Edit requested but no context found. Falling back to generate.")
 
     async def stream():
         global LAST_SCRIPT, LAST_SCRIPT_ID
@@ -668,6 +698,7 @@ async def chat(
                 research_brief=parsed_research,
                 mode=mode,
                 existing_script=existing_script,
+                preferences=session.get("preferences"),
             ):
                 if chunk.startswith("result:"):
                     full_output.append(chunk[7:].strip())
@@ -680,11 +711,19 @@ async def chat(
             if full_output:
                 combined_script = "\n".join(full_output).strip()
                 if combined_script:
+                    # Update session
+                    session["current_script"] = combined_script
+                    session["history"].append({
+                        "prompt": prompt,
+                        "output": combined_script
+                    })
+                    
+                    # Backward compatibility
                     LAST_SCRIPT = combined_script
                     new_id = script_id if script_id else str(uuid.uuid4())[:12]
                     LAST_SCRIPT_ID = new_id
                     _script_cache[new_id] = combined_script
-                    logger.info(f"[{trace_id}] Auto-saved LAST_SCRIPT (id={new_id})")
+                    logger.info(f"[{trace_id}] Auto-saved to session and LAST_SCRIPT (id={new_id})")
 
         except Exception as e:
             logger.error(f"[{trace_id}] Unhandled stream error: {e}")

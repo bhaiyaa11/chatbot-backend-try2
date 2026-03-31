@@ -164,6 +164,7 @@ def _build_enriched_prompt(
     metadata: dict,
     research_brief: dict,
     human_truth: dict = None,
+    preferences: dict = None,
 ) -> str:
     blocks = []
 
@@ -237,6 +238,19 @@ def _build_enriched_prompt(
     # ── Block 4: User prompt ─────────────────────────────────────
     blocks.append(f"USER REQUEST:\n{prompt}")
 
+    # ── Block 5: Style guidelines (soft preferences) ───────────
+    if preferences:
+        lines = []
+        if preferences.get("tone"):
+            lines.append(f"- Tone: {preferences['tone']}")
+        if preferences.get("length"):
+            lines.append(f"- Length: {preferences['length']}")
+        if preferences.get("style"):
+            lines.append(f"- Style: {preferences['style']}")
+        
+        if lines:
+            blocks.append("Style Guidelines:\n" + "\n".join(lines))
+
     return "\n\n".join(blocks)
 
 
@@ -249,6 +263,7 @@ class VoiceOverStage(BaseStage):
         file_parts: list,
         metadata: dict = None,
         research_brief: dict = None,
+        preferences: dict = None,
     ) -> VoiceOverOutput:
 
         budget = TOKEN_BUDGETS["VOICE_OVER"]
@@ -287,6 +302,7 @@ class VoiceOverStage(BaseStage):
             metadata=metadata or {},
             research_brief=research_brief,
             human_truth=human_truth,
+            preferences=preferences,
         )
 
         print(f"PROMPT SENT TO LLM:\n{enriched_prompt[:600]}...")

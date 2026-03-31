@@ -1,10 +1,3 @@
-
-
-# adding gemini3 location preview
-
-
-
-
 import json, time, asyncio, logging, random
 from google import genai
 from config import MODEL_ENDPOINTS, MAX_RETRIES, get_genai_client
@@ -114,6 +107,31 @@ async def call_llm(stage: str, contents: list) -> tuple[dict, int, bool]:
         f"Total attempts: {total_attempts}"
     )
 
+
+
+async def generate_text(stage: str, contents: list) -> str:
+    """
+    Non-JSON LLM call.
+    Returns raw text (used for edit mode).
+    """
+    endpoints = MODEL_ENDPOINTS[stage]
+
+    for endpoint in endpoints:
+        client, model_id = _get_client_and_model(stage, endpoint)
+        try:
+            response = await client.aio.models.generate_content(
+                model=model_id,
+                contents=contents
+            )
+            return (response.text or "").strip()
+
+        except Exception as e:
+            if _is_quota_error(e):
+                logger.warning(f"[generate_text/{stage}] Quota on {endpoint}, trying fallback")
+                continue
+            raise
+
+    raise RuntimeError(f"[{stage}] Failed to generate text (non-JSON mode)")
 
 async def stream_llm(stage: str, contents: list):
     """Async generator yielding raw text chunks. Used for final streaming stage."""
