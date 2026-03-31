@@ -215,7 +215,7 @@
 #  docker run -p 8080:8080 --env-file .env chatbot-backend-try2
 # uvicorn api.index:app --reload --port 8000
 # export GOOGLE_APPLICATION_CREDENTIALS="/Users/jayagrawal/Downloads/poc-script-genai-29c4a48586bf.json"
-
+# export GOOGLE_CREDENTIALS_JSON="/Users/jayagrawal/Downloads/poc-script-genai-29c4a48586bf.json"
 
 
 

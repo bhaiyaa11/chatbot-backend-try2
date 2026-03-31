@@ -308,18 +308,50 @@ STAGE_LOCATIONS = {
 def get_genai_client(location: str = "us-central1"):
     from google import genai
     from google.oauth2 import service_account
+    base64_creds = os.environ.get("GOOGLE_CREDENTIALS_BASE64")
 
-    creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
-    if creds_json:
-        info = json.loads(creds_json)
-        credentials = service_account.Credentials.from_service_account_info(info)
-        project_id = info.get("project_id", "poc-script-genai")
-        return genai.Client(
-            vertexai=True,
-            project=project_id,
-            location=location,
-            credentials=credentials
-        )
+    if base64_creds:
+        try:
+            # Step 1: Decode base64 → JSON string
+            decoded = base64.b64decode(base64_creds).decode("utf-8")
+
+            # Step 2: Convert to dict
+            info = json.loads(decoded)
+
+            # Step 3: Create credentials with proper scope
+            credentials = service_account.Credentials.from_service_account_info(
+                info,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            )
+
+            # Step 4: Create GenAI client
+            return genai.Client(
+                vertexai=True,
+                project=info["project_id"],
+                location=location,
+                credentials=credentials,
+            )
+
+        except Exception as e:
+            raise RuntimeError(f"GCP Auth Failed: {str(e)}")
+
+    # creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+    # if creds_json:
+    #     info = json.loads(creds_json)
+        
+    #     # Vertex AI APIs strictly require the cloud-platform scope
+    #     scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+    #     credentials = service_account.Credentials.from_service_account_info(
+    #         info, scopes=scopes
+    #     )
+        
+    #     project_id = info.get("project_id", "poc-script-genai")
+    #     return genai.Client(
+    #         vertexai=True,
+    #         project=project_id,
+    #         location=location,
+    #         credentials=credentials
+    #     )
     
     # Fallback to local default Application Default Credentials
     return genai.Client(vertexai=True, project="poc-script-genai", location=location)
