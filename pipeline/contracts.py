@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Any, Union
 
@@ -23,6 +15,8 @@ class VoiceOverOutput(BaseModel):
     duration_seconds: int
     word_count: int
     segments: List[ScriptSegment]
+    internal_sources: List[str] = Field(default_factory=list)
+    web_sources: List[str] = Field(default_factory=list)
 
     def to_visuals_input(self) -> dict:
         """Minimal representation for visuals stage — saves ~40% tokens."""

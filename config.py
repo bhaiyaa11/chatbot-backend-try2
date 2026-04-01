@@ -49,8 +49,14 @@ Output STRICTLY as JSON:
   "word_count": 120,
   "segments": [
     {"time_start": 0, "time_end": 8, "voiceover": "..."}
-  ]
+  ],
+  "internal_sources": ["INT-01", "INT-02"],
+  "web_sources": ["URL 1", "URL 2"]
 }
+SOURCE ATTRIBUTION:
+- For every INTERNAL SCRIPT INSPIRATION provided in the prompt, if used or inspired by, list its ID (e.g., 'INT-01') in "internal_sources".
+- For every fact or detail from NICHE RESEARCH or DOCUMENT GROUNDING, if the source URL is known, list it in "web_sources".
+- Do not repeat sources.
 Do not include markdown fences. Output raw JSON only.
 """,
 

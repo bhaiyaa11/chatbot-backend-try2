@@ -3,11 +3,47 @@ from typing import AsyncGenerator
 from pipeline.stages.voice_over import VoiceOverStage
 from pipeline.stages.visuals import VisualsStage
 from pipeline.stages.critic import CriticStage
+from pipeline.stages.rag_retrieval import RAGRetrievalStage
 from pipeline.contracts import StageResult
 from config import PIPELINE_TIMEOUT_SECONDS
 from pipeline.llm_client import call_llm
+import os
+from supabase import create_client
 
 logger = logging.getLogger(__name__)
+
+async def _log_generation(
+    prompt: str,
+    metadata: dict,
+    retrieved_chunks: list,
+    vo_data: any,
+    final_output: str
+):
+    """Saves the generation event to Supabase for future ranking."""
+    try:
+        supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+        
+        # Extract metadata
+        internal_ids = [c.get("id") for c in (retrieved_chunks or []) if c.get("id")]
+        
+        # Extract web sources from VoiceOver if it's a Pydantic object
+        web_sources = getattr(vo_data, "web_sources", []) if hasattr(vo_data, "web_sources") else []
+
+        supabase.table("generations_log").insert({
+            "input_params": {
+                "prompt": prompt,
+                "metadata": metadata
+            },
+            "output_script": final_output,
+            "retrieved_chunk_ids": internal_ids,
+            "sources": {
+                "internal": getattr(vo_data, "internal_sources", []) if hasattr(vo_data, "internal_sources") else [],
+                "web": web_sources
+            }
+        }).execute()
+        logger.info("[Orchestrator] Generation log saved to Supabase")
+    except Exception as e:
+        logger.warning(f"[Orchestrator] Failed to save generation log: {e}")
 
 
 
@@ -69,6 +105,16 @@ Do NOT create a new concept. Just improve it.
         "duration":      duration,
     }
 
+    # ── Stage 0 — RAG Retrieval ─────────────────────────────────
+    yield "status:Searching for internal script inspirations...\n"
+    
+    rag_res: StageResult = await RAGRetrievalStage().run(
+        prompt=prompt,
+        metadata=metadata
+    )
+    trace.append(rag_res.model_dump(exclude={"data"}))
+    retrieved_chunks = rag_res.data if rag_res.success else []
+
     # ── Stage 1 — VoiceOver ──────────────────────────────────────
     yield "status:Drafting voiceover script...\n"
 
@@ -77,6 +123,7 @@ Do NOT create a new concept. Just improve it.
         file_parts=file_parts,
         metadata=metadata,
         research_brief=research_brief,
+        retrieved_chunks=retrieved_chunks,        # ← PASS RAG DATA
         preferences=preferences,
     )
     trace.append(r1.model_dump(exclude={"data"}))
@@ -118,6 +165,15 @@ Do NOT create a new concept. Just improve it.
 
     yield f"result:{r3.data}\n"
     # yield r3.data  # stream markdown table directly, without "result:" prefix — frontend can detect this and render accordingly
+
+    # ── Final Logging ───────────────────────────────────────────
+    asyncio.create_task(_log_generation(
+        prompt=prompt,
+        metadata=metadata,
+        retrieved_chunks=retrieved_chunks,
+        vo_data=r1.data,
+        final_output=str(r3.data)
+    ))
 
 
 

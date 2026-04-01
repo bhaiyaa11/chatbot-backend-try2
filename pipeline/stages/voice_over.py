@@ -165,8 +165,26 @@ def _build_enriched_prompt(
     research_brief: dict,
     human_truth: dict = None,
     preferences: dict = None,
+    retrieved_chunks: List[Dict] = None,
 ) -> str:
     blocks = []
+
+    # ── Block 0: Internal Inspirations (RAG) ────────────────────
+    if retrieved_chunks:
+        inspiration_lines = []
+        for i, chunk in enumerate(retrieved_chunks):
+            ref_id = f"INT-{i+1:02d}"
+            type_label = chunk.get("type", "script").upper()
+            content = chunk.get("content", "").strip()
+            inspiration_lines.append(f"[{ref_id}] {type_label}: {content}")
+        
+        if inspiration_lines:
+            blocks.append(
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"INTERNAL SCRIPT INSPIRATIONS (DO NOT COPY, LEARN FROM STYLE)\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                + "\n\n".join(inspiration_lines)
+            )
 
     # ── Block 0: Human truth — the narrative spine ───────────────
     if human_truth:
@@ -264,6 +282,7 @@ class VoiceOverStage(BaseStage):
         metadata: dict = None,
         research_brief: dict = None,
         preferences: dict = None,
+        retrieved_chunks: List[Dict] = None,
     ) -> VoiceOverOutput:
 
         budget = TOKEN_BUDGETS["VOICE_OVER"]
@@ -303,6 +322,7 @@ class VoiceOverStage(BaseStage):
             research_brief=research_brief,
             human_truth=human_truth,
             preferences=preferences,
+            retrieved_chunks=retrieved_chunks,
         )
 
         print(f"PROMPT SENT TO LLM:\n{enriched_prompt[:600]}...")
