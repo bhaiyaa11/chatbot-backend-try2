@@ -5,7 +5,8 @@ logger = logging.getLogger(__name__)
 
 
 class PipelineCache:
-    def __init__(self, ttl_seconds: int = 3600):
+    # def __init__(self, ttl_seconds: int = 3600):
+    def __init__(self, ttl_seconds: int = 86400):
         self._store: dict = {}
         self._ttl = ttl_seconds
 
@@ -64,4 +65,5 @@ def get_script(script_id: str):
 
 
 # Singleton used across the app
-cache = PipelineCache(ttl_seconds=3600)
+# cache = PipelineCache(ttl_seconds=3600)
+cache = PipelineCache(ttl_seconds=86400)
