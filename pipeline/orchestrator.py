@@ -12,6 +12,134 @@ from supabase import create_client
 
 logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Conversation-aware system prompt for edit/modification mode
+# This replaces keyword-based intent detection entirely.
+# The LLM sees the conversation history and naturally handles
+# "make it more human", "shorten this", "rewrite the hook", etc.
+# ---------------------------------------------------------------------------
+CONVERSATIONAL_EDIT_SYSTEM_PROMPT = """\
+You are an expert B2B video scriptwriter and editor working collaboratively
+with a user. You have access to the full conversation history below.
+
+RULES:
+1. If the user is asking you to MODIFY an existing script, apply their
+   instruction to the most recent script version. Maintain the format
+   (if it's a markdown table, output a markdown table).
+2. If the user is asking a QUESTION about the script, answer concisely.
+3. If the user wants something ENTIRELY NEW (different topic, different
+   client), say so and they should start a new generation.
+4. Preserve all factual content unless the user explicitly asks to change it.
+5. Do NOT explain your changes — just output the modified script.
+6. If the user expresses a preference (tone, length, style), apply it
+   to the current script.
+
+You are a collaborator, not a tool. Respond naturally."""
+
+
+async def run_conversational_pipeline(
+    prompt: str,
+    context,  # AssembledContext from memory.context_assembler
+    file_parts: list,
+    trace: list,
+    client: str = "",
+    business_unit: str = "",
+    video_type: str = "",
+    video_tone: str = "",
+    duration: str = "",
+    research_brief: dict = None,
+) -> "AsyncGenerator[str, None]":
+    """
+    Conversation-aware orchestrator entry point.
+
+    Decision logic:
+    1. If context.last_script exists (conversation has a prior script),
+       run in conversational edit mode — the LLM receives full conversation
+       history and decides how to modify the script based on the user's
+       natural language request. NO keyword detection.
+    2. If no prior script exists, run the full generation pipeline
+       (VoiceOver → Visuals → Critic) — same as before.
+
+    This function replaces the mode="edit" / detect_intent() pattern.
+    """
+    # ── CONVERSATIONAL EDIT MODE ──────────────────────────────────
+    # If the conversation already has a script, send the full context
+    # to the LLM and let it handle modifications naturally.
+    if context.has_prior_context and context.last_script:
+        yield "status:Processing your request...\n"
+
+        # Build the conversation-aware prompt
+        parts = [CONVERSATIONAL_EDIT_SYSTEM_PROMPT]
+
+        # Add conversation summary (long-term memory)
+        if context.summaries:
+            parts.append(
+                f"━━━ CONVERSATION HISTORY SUMMARY ━━━\n{context.summaries}"
+            )
+
+        # Add relevant semantic matches
+        if context.relevant_context_formatted:
+            parts.append(
+                f"━━━ RELEVANT PAST CONTEXT ━━━\n"
+                f"{context.relevant_context_formatted}"
+            )
+
+        # Add recent messages (short-term memory)
+        if context.recent_messages:
+            parts.append(
+                f"━━━ RECENT CONVERSATION ━━━\n"
+                f"{context.recent_messages_formatted}"
+            )
+
+        # Add the current script explicitly
+        parts.append(
+            f"━━━ CURRENT SCRIPT (LATEST VERSION) ━━━\n"
+            f"{context.last_script}"
+        )
+
+        # Add the user's new message
+        parts.append(
+            f"━━━ USER'S NEW REQUEST ━━━\n{prompt}"
+        )
+
+        full_prompt = "\n\n".join(parts)
+
+        from pipeline.llm_client import generate_text
+        result = await generate_text("CRITIC", [full_prompt])
+
+        if not result or not result.strip():
+            yield "error:Edit returned empty response\n"
+            return
+
+        yield f"result:{result}\n"
+        return
+
+    # ── FULL GENERATION MODE ──────────────────────────────────────
+    # No prior script in conversation — run the full pipeline.
+    # Delegate to the existing run_pipeline function.
+    metadata = {
+        "client": client,
+        "business_unit": business_unit,
+        "video_type": video_type,
+        "video_tone": video_tone,
+        "duration": duration,
+    }
+
+    async for chunk in run_pipeline(
+        prompt=prompt,
+        file_parts=file_parts,
+        trace=trace,
+        client=client,
+        business_unit=business_unit,
+        video_type=video_type,
+        video_tone=video_tone,
+        duration=duration,
+        research_brief=research_brief,
+    ):
+        yield chunk
+
+
 async def _log_generation(
     prompt: str,
     metadata: dict,

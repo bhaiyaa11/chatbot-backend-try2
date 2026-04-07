@@ -17,7 +17,8 @@ _STAGE_LOCATIONS = {
 def _get_client_and_model(stage: str, endpoint: str):
     location = _STAGE_LOCATIONS.get(stage, "us-central1")
     client = get_genai_client(location=location)
-    return client, endpoint
+    model_id = endpoint.strip()
+    return client, model_id
 
 
 def _parse_json_response(text: str) -> dict:
