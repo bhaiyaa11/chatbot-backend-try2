@@ -454,16 +454,18 @@ def _transcribe_audio(path: str) -> str | None:
 
 
 def _get_transcript(video_id: str) -> str | None:
-    try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=["en"])
-        text = " ".join([t["text"] for t in transcript])
-        if len(text) < 50:
-            return None
-        logger.info(f"[NicheResearch] ✅ YouTube transcript: {video_id} ({len(text)} chars)")
-        return text
-    except Exception:
-        logger.info(f"[NicheResearch] No YouTube transcript for {video_id} — trying Whisper fallback")
-
+    # try:
+    #     transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=["en"])
+    #     text = " ".join([t["text"] for t in transcript])
+    #     if len(text) < 50:
+    #         return None
+    #     logger.info(f"[NicheResearch] ✅ YouTube transcript: {video_id} ({len(text)} chars)")
+    #     return text
+    # except Exception:
+    #     logger.info(f"[NicheResearch] No YouTube transcript for {video_id} — trying Whisper fallback")
+    
+    logger.info(f"[NicheResearch] Downloading + transcribing: {video_id}")
+    
     audio_path = _download_audio(video_id)
     if not audio_path:
         return None
@@ -605,7 +607,7 @@ async def _run_youtube_searches(queries: list) -> tuple:
         logger.info(f"[NicheResearch] Skipped {before - len(unique)} videos over 10 minutes")
 
     unique.sort(key=lambda x: x["engagement"], reverse=True)
-    top_videos = unique[:8]
+    top_videos = unique[:3]
     logger.info(f"[NicheResearch] Analyzing top {len(top_videos)} videos by engagement...")
 
     results = [r for r in await asyncio.gather(
