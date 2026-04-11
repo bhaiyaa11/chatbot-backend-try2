@@ -567,7 +567,7 @@ async def _run_youtube_searches(queries: list) -> tuple:
 
     video_candidates = []
     async with httpx.AsyncClient(timeout=15) as client:
-        for query in queries[:3]:
+        for query in queries[:2]:
             try:
                 url = (
                     f"https://www.googleapis.com/youtube/v3/search"
@@ -607,7 +607,7 @@ async def _run_youtube_searches(queries: list) -> tuple:
         logger.info(f"[NicheResearch] Skipped {before - len(unique)} videos over 10 minutes")
 
     unique.sort(key=lambda x: x["engagement"], reverse=True)
-    top_videos = unique[:3]
+    top_videos = unique[:2]
     logger.info(f"[NicheResearch] Analyzing top {len(top_videos)} videos by engagement...")
 
     results = [r for r in await asyncio.gather(
