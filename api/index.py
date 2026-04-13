@@ -455,15 +455,27 @@ async def chat(
     logger.info(f"[{trace_id}] Conversation: {conv_id} (msgs={conversation.message_count})")
 
     # ── 3. Save the user message ──────────────────────────────────
+    # user_msg = await conversation_manager.save_message(
+    #     conversation_id=conv_id,
+    #     role="user",
+    #     content=prompt,
+    #     message_type="text",
+    #     metadata=metadata,
+    #     user_id=user_id,
+    # )
+    user_message_metadata = {**metadata}
+    if research_id:
+        user_message_metadata["research_id"] = research_id
+ 
     user_msg = await conversation_manager.save_message(
         conversation_id=conv_id,
         role="user",
         content=prompt,
         message_type="text",
-        metadata=metadata,
+        metadata=user_message_metadata,   # ← was just `metadata`
         user_id=user_id,
     )
-
+ 
     # ── 4. Assemble context (short-term + long-term + vector) ─────
     context = await context_assembler.assemble(
         conversation_id=conv_id,
@@ -690,6 +702,22 @@ async def run_research(
         "error": result.error,
     }
 
+@app.get("/research/{research_id}")
+async def get_research_brief(research_id: str):
+    """
+    Fetch a stored research brief by its short ID.
+    Called by the frontend on page load to reconstruct research pills
+    for user messages that have metadata.research_id set.
+    """
+    try:
+        data = await conversation_manager.get_research_brief(research_id)
+        if data is None:
+            return JSONResponse({"error": "Research brief not found"}, status_code=404)
+        return {"success": True, "research": data, "research_id": research_id}
+    except Exception as e:
+        logger.error(f"[/research/{research_id}] Error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+ 
 
 # ---------------------------------------------------------------------------
 # /messages — paginated message retrieval (enhanced)
