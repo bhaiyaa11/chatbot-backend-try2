@@ -113,11 +113,11 @@ RULES:
 
 MODEL_ENDPOINTS = {
     "VOICE_OVER": [
-        "projects/poc-script-genai/locations/us-central1/endpoints/7036259241010659328",
+        "projects/poc-script-genai/locations/us-central1/endpoints/28411930217545728",
         "gemini-2.5-flash-lite",
     ],
     "VISUALS": [
-        "projects/poc-script-genai/locations/us-central1/endpoints/3630412022811721728",
+        "projects/poc-script-genai/locations/us-central1/endpoints/7105818744630280192	",
         "gemini-2.5-flash-lite",
     ],
     "CRITIC": [
