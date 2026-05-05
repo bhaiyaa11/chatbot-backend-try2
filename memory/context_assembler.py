@@ -15,7 +15,7 @@ naturally understands "make it more human" or "shorten this".
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
-
+from memory.log_store import add_log
 from memory.conversation_manager import ConversationManager, Message
 from memory.summarizer import ConversationSummarizer
 from memory.vector_memory import VectorMemory
@@ -188,15 +188,29 @@ class ContextAssembler:
                 f"{ctx.total_context_tokens} to ~{self.MAX_CONTEXT_TOKENS} tokens"
             )
 
-        logger.info(
-            f"[ContextAssembler] Assembled context for conv={conversation_id}: "
-            f"summary={'yes' if ctx.summaries else 'no'}, "
-            f"messages={len(ctx.recent_messages)}, "
-            f"vector_matches={len(ctx.relevant_context)}, "
-            f"has_script={'yes' if ctx.last_script else 'no'}, "
-            f"tokens≈{ctx.total_context_tokens}"
-        )
+        # logger.info(
+        #     f"[ContextAssembler] Assembled context for conv={conversation_id}: "
+        #     f"summary={'yes' if ctx.summaries else 'no'}, "
+        #     f"messages={len(ctx.recent_messages)}, "
+        #     f"vector_matches={len(ctx.relevant_context)}, "
+        #     f"has_script={'yes' if ctx.last_script else 'no'}, "
+        #     f"tokens≈{ctx.total_context_tokens}"
+        # )
 
+        # return ctx
+    
+        log_data = {
+            "event": "context_assembled",
+            "conversation_id": conversation_id,
+            "summary": bool(ctx.summaries),
+            "messages": len(ctx.recent_messages),
+            "vector_matches": len(ctx.relevant_context),
+            "has_script": bool(ctx.last_script),
+            "tokens": ctx.total_context_tokens,
+        }
+        logger.info(log_data)
+        add_log(log_data)
+ 
         return ctx
 
     def _estimate_total_tokens(self, ctx: AssembledContext) -> int:
