@@ -60,7 +60,7 @@ class ConversationSummarizer:
     create new ones that supersede them. This provides an audit trail.
     """
 
-    SUMMARY_THRESHOLD = 30   # Start summarizing after this many messages
+    SUMMARY_THRESHOLD = 30    # Start summarizing after this many messages
     RECENT_LIMIT = 15        # Always keep this many recent messages verbatim
 
     def __init__(self, supabase_client: Client = None):

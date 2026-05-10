@@ -58,6 +58,39 @@ class RAGProcessor:
             
         return False
 
+    def extract_chunks(self, script: str) -> List[Dict]:
+        """
+        Heuristic-based chunker for script identification.
+        Splits into: hook, body, and cta.
+        """
+        lines = [l.strip() for l in script.split("\n") if l.strip()]
+        chunks = []
+
+        if not lines:
+            return []
+
+        # Hook: First non-empty line
+        chunks.append({
+            "type": "hook",
+            "content": lines[0]
+        })
+
+        # Body: Everything in between
+        if len(lines) > 2:
+            chunks.append({
+                "type": "body",
+                "content": "\n".join(lines[1:-1])
+            })
+
+        # CTA: Last non-empty line
+        if len(lines) > 1:
+            chunks.append({
+                "type": "cta",
+                "content": lines[-1]
+            })
+
+        return chunks
+
     async def process_and_ingest(self, script_data: Dict):
         """
         Main entry point for ingestion.
@@ -92,8 +125,12 @@ class RAGProcessor:
         # 2. Process and insert chunks
         chunks = script_data.get("chunks", [])
         if not chunks:
-            # Fallback: if no chunks provided, treat full script as one 'body' chunk
-            chunks = [{"type": "body", "content": content}]
+            # New: Use heuristic chunker if no chunks provided
+            chunks = self.extract_chunks(content)
+            
+            # Fallback if chunker still returns nothing
+            if not chunks:
+                chunks = [{"type": "body", "content": content}]
 
         chunk_insert_tasks = []
         for chunk in chunks:
