@@ -16,3 +16,6 @@ service-account.json
 .env.*
 *.env
 service-account.json
+generated_audio/*
+generated_audio/*.wav
+generated_audio/*.mp3

@@ -17,6 +17,22 @@ from memory.conversation_manager import ConversationManager
 from memory.context_assembler import ContextAssembler
 from memory.summarizer import ConversationSummarizer
 from memory.vector_memory import VectorMemory
+from pydantic import BaseModel
+
+from fastapi.staticfiles import StaticFiles
+
+from tts.tts import (
+    generate_cinematic_voiceover
+)
+from google import genai
+
+logger = logging.getLogger(__name__)
+
+WORKING_MODEL          = "projects/poc-script-genai/locations/global/publishers/google/models/gemini-3-flash-preview"
+VERTEX_SEARCH_PROJECT  = "poc-script-genai"
+VERTEX_SEARCH_LOCATION = "global"
+VERTEX_SEARCH_APP_ID   = "script-research_1773405109220"
+
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +62,12 @@ context_assembler = ContextAssembler(
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
+
+class VoiceRequest(BaseModel):
+
+    script: str
+
+    voice_type: str
 app = FastAPI()
 
 _ALLOWED_ORIGINS = [
@@ -519,4 +541,169 @@ def get_context_logs():
     return get_logs()
  
 
+
+@app.post("/enhance")
+async def enhance_prompt(
+    prompt: str = Form(...)
+):
+
+    try:
+
+        client = get_genai_client()
+
+        system_prompt = """
+You are an expert prompt engineer.
+
+Improve the prompt.
+Preserve intent.
+Return ONLY improved prompt.
+"""
+
+        response = (
+            await client.aio.models.generate_content(
+                model=WORKING_MODEL,
+
+                contents=f"""
+{system_prompt}
+
+{prompt}
+"""
+            )
+        )
+
+        return {
+            "success": True,
+            "enhanced": response.text.strip()
+        }
+
+    except Exception as e:
+
+        logger.error(
+            f"[/enhance] {e}"
+        )
+
+        return JSONResponse(
+            {
+                "success": False,
+                "error": str(e)
+            },
+            status_code=500
+        )
+    
+# app.mount(
+
+#     "/generated_audio",
+
+#     StaticFiles(
+#         directory="generated_audio"
+#     ),
+
+#     name="generated_audio"
+# )
+
+# @app.post("/generate-voice")
+# async def generate_voice(
+#     data: VoiceRequest
+# ):
+
+#     try:
+
+#         print("VOICE REQUEST RECEIVED")
+
+#         print(data.voice_type)
+
+#         result = await generate_cinematic_voiceover(
+
+#             final_script=data.script,
+
+#             voice_type=data.voice_type
+#         )
+
+#         return {
+
+#             "success": True,
+
+#             "audio_url":
+#                 f"http://localhost:8000/{result['final_audio']}"
+#         }
+
+#     except Exception as e:
+
+#         logger.error(
+#             f"[/generate-voice] {e}"
+#         )
+
+#         return JSONResponse(
+
+#             {
+#                 "success": False,
+#                 "error": str(e)
+#             },
+
+#             status_code=500
+#         )
+    
+
+
+@app.post("/generate-voice")
+async def generate_voice(data: VoiceRequest):
+
+    try:
+
+        logger.info("VOICE REQUEST RECEIVED")
+
+        result = await generate_cinematic_voiceover(
+            final_script=data.script,
+            voice_type=data.voice_type
+        )
+
+        # Example:
+        # generated_audio/final_voiceover.wav
+        audio_path = result["final_audio"]
+
+        # Convert to browser-safe URL
+        filename = os.path.basename(audio_path)
+
+        audio_url = f"/audio/{filename}"
+
+        return JSONResponse({
+            "success": True,
+            "audio_url": audio_url
+        })
+
+    except Exception as e:
+
+        logger.error(f"[/generate-voice] {e}")
+
+        return JSONResponse(
+            {
+                "success": False,
+                "error": str(e)
+            },
+            status_code=500
+        )
+from fastapi.responses import FileResponse
+
+@app.get("/audio/{filename}")
+async def stream_audio(filename: str):
+
+    file_path = os.path.join("generated_audio", filename)
+
+    if not os.path.exists(file_path):
+
+        return JSONResponse(
+            {
+                "success": False,
+                "error": "Audio file not found"
+            },
+            status_code=404
+        )
+
+    return FileResponse(
+        path=file_path,
+        media_type="audio/wav",
+        headers={
+            "Content-Disposition": "inline"
+        }
+    )
 # uvicorn api.index:app --reload

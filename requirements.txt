@@ -132,3 +132,5 @@ youtube-transcript-api
 yt-dlp
 faster-whisper
 deepgram-sdk==3.*
+anthropic
+elevenlabs
