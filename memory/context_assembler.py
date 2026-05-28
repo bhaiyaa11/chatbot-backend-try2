@@ -188,16 +188,6 @@ class ContextAssembler:
                 f"{ctx.total_context_tokens} to ~{self.MAX_CONTEXT_TOKENS} tokens"
             )
 
-        # logger.info(
-        #     f"[ContextAssembler] Assembled context for conv={conversation_id}: "
-        #     f"summary={'yes' if ctx.summaries else 'no'}, "
-        #     f"messages={len(ctx.recent_messages)}, "
-        #     f"vector_matches={len(ctx.relevant_context)}, "
-        #     f"has_script={'yes' if ctx.last_script else 'no'}, "
-        #     f"tokens≈{ctx.total_context_tokens}"
-        # )
-
-        # return ctx
     
         log_data = {
             "event": "context_assembled",

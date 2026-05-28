@@ -589,60 +589,6 @@ Return ONLY improved prompt.
             },
             status_code=500
         )
-    
-# app.mount(
-
-#     "/generated_audio",
-
-#     StaticFiles(
-#         directory="generated_audio"
-#     ),
-
-#     name="generated_audio"
-# )
-
-# @app.post("/generate-voice")
-# async def generate_voice(
-#     data: VoiceRequest
-# ):
-
-#     try:
-
-#         print("VOICE REQUEST RECEIVED")
-
-#         print(data.voice_type)
-
-#         result = await generate_cinematic_voiceover(
-
-#             final_script=data.script,
-
-#             voice_type=data.voice_type
-#         )
-
-#         return {
-
-#             "success": True,
-
-#             "audio_url":
-#                 f"http://localhost:8000/{result['final_audio']}"
-#         }
-
-#     except Exception as e:
-
-#         logger.error(
-#             f"[/generate-voice] {e}"
-#         )
-
-#         return JSONResponse(
-
-#             {
-#                 "success": False,
-#                 "error": str(e)
-#             },
-
-#             status_code=500
-#         )
-    
 
 
 @app.post("/generate-voice")
@@ -706,4 +652,6 @@ async def stream_audio(filename: str):
             "Content-Disposition": "inline"
         }
     )
+
+
 # uvicorn api.index:app --reload

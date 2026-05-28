@@ -51,27 +51,43 @@ def _build_enriched_prompt(
     research_brief: dict,
     human_truth: dict = None,
     preferences: dict = None,
-    retrieved_chunks: List[Dict] = None,
+    # retrieved_chunks: List[Dict] = None,
+    semantic_inspiration: Dict = None,
 ) -> str:
     blocks = []
 
     # ── Block 0: Internal Inspirations (RAG) ────────────────────
-    if retrieved_chunks:
-        inspiration_lines = []
-        for i, chunk in enumerate(retrieved_chunks):
-            ref_id = f"INT-{i+1:02d}"
-            type_label = chunk.get("type", "script").upper()
-            content = chunk.get("content", "").strip()
-            inspiration_lines.append(f"[{ref_id}] {type_label}: {content}")
+    # if retrieved_chunks:
+    #     inspiration_lines = []
+    #     for i, chunk in enumerate(retrieved_chunks):
+    #         ref_id = f"INT-{i+1:02d}"
+    #         type_label = chunk.get("type", "script").upper()
+    #         content = chunk.get("content", "").strip()
+    #         inspiration_lines.append(f"[{ref_id}] {type_label}: {content}")
         
-        if inspiration_lines:
-            blocks.append(
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"INTERNAL SCRIPT INSPIRATIONS (DO NOT COPY, LEARN FROM STYLE)\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                + "\n\n".join(inspiration_lines)
-            )
+    #     if inspiration_lines:
+    #         blocks.append(
+    #             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    #             f"INTERNAL SCRIPT INSPIRATIONS (DO NOT COPY, LEARN FROM STYLE)\n"
+    #             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    #             + "\n\n".join(inspiration_lines)
+    #         )
+    # ── Block 0: Semantic Inspiration Engine ────────────────────
+    if semantic_inspiration:
 
+        blocks.append(
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"SEMANTIC INSPIRATION ENGINE\n"
+            f"(Abstract creative influence — NEVER copy literally)\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{semantic_inspiration}\n\n"
+            f"IMPORTANT:\n"
+            f"- Use this as abstract inspiration only\n"
+            f"- Never reproduce wording or structure\n"
+            f"- Use it to influence emotional tone,\n"
+            f"  pacing, narrative energy, themes,\n"
+            f"  and storytelling DNA\n"
+        )
     # ── Block 0: Human truth — the narrative spine ───────────────
     if human_truth:
         blocks.append(
@@ -168,7 +184,8 @@ class VoiceOverStage(BaseStage):
         metadata: dict = None,
         research_brief: dict = None,
         preferences: dict = None,
-        retrieved_chunks: List[Dict] = None,
+        # retrieved_chunks: List[Dict] = None,
+        semantic_inspiration: Dict = None,
     ) -> VoiceOverOutput:
 
         budget = TOKEN_BUDGETS["VOICE_OVER"]
@@ -201,6 +218,10 @@ class VoiceOverStage(BaseStage):
                     logger.warning(f"[VoiceOver] Human truth extraction failed: {e}")
 
         # ── Build enriched prompt ─────────────────────────────────
+        print("\n" + "=" * 60)
+        print("[VoiceOver] RECEIVED SEMANTIC INSPIRATION")
+        print(str(semantic_inspiration)[:2000])
+        print("=" * 60 + "\n")
         trimmed_prompt  = prompt[:budget["prompt_budget"]]
         enriched_prompt = _build_enriched_prompt(
             prompt=trimmed_prompt,
@@ -208,10 +229,12 @@ class VoiceOverStage(BaseStage):
             research_brief=research_brief,
             human_truth=human_truth,
             preferences=preferences,
-            retrieved_chunks=retrieved_chunks,
+            # retrieved_chunks=retrieved_chunks,
+            semantic_inspiration=semantic_inspiration,
         )
 
-        print(f"PROMPT SENT TO LLM:\n{enriched_prompt[:600]}...")
+        # print(f"PROMPT SENT TO LLM:\n{enriched_prompt[:600]}...")
+        print(f"PROMPT SENT TO LLM:\n{enriched_prompt[:300]}...")
 
         system_prompt = SYSTEM_PROMPTS["VOICE_OVER"]
 
