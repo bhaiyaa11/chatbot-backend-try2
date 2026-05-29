@@ -121,6 +121,8 @@ async def chat(
     research_id:    str = Form(""),
     research_brief: str = Form(""),
     user_id:        str = Form("anonymous"),
+    creativity_ratio: float = Form(0.5),   # ADD THIS
+
     files: Optional[List[UploadFile]] = File(None),
 ):
     trace_id = str(uuid.uuid4())[:8]
@@ -190,6 +192,9 @@ async def chat(
         full_output = []
         try:
             file_parts = await parse_files(files or [], stage="VOICE_OVER")
+            preferences = {                          # ADD THIS BLOCK
+                "creativity_ratio": creativity_ratio,
+            }
             
             async for chunk in run_conversational_pipeline(
                 prompt=prompt,
@@ -202,6 +207,7 @@ async def chat(
                 video_tone=video_tone,
                 duration=duration,
                 research_brief=parsed_research,
+                preferences=preferences,             # ADD THIS
             ):
                 if chunk.startswith("result:"):
                     full_output.append(chunk[7:].strip())
@@ -372,6 +378,7 @@ async def run_research(
     video_tone: str = Form(""),
     duration: str = Form(""),
     prompt: str = Form(""),
+    creativity_ratio: float = Form(0.5),    # ADD THIS
     files: Optional[List[UploadFile]] = File(None),
 ):
     metadata = {
