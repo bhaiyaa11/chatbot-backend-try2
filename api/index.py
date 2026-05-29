@@ -1,3 +1,5 @@
+from anthropic import AsyncAnthropic
+import os
 import uuid, json, logging, asyncio
 from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, APIRouter, Query
@@ -59,6 +61,9 @@ context_assembler = ContextAssembler(
     vector_memory=vector_memory,
 )
 
+anthropic_client = AsyncAnthropic(
+    api_key=os.getenv("ANTHROPIC_API_KEY")
+)
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
@@ -549,45 +554,108 @@ def get_context_logs():
  
 
 
+# @app.post("/enhance")
+# async def enhance_prompt(
+#     prompt: str = Form(...)
+# ):
+
+#     try:
+
+#         client = get_genai_client()
+
+#         system_prompt = """
+# You are an expert prompt engineer.
+
+# Improve the prompt.
+# Preserve intent.
+# Return ONLY improved prompt.
+# """
+
+#         response = (
+#             await client.aio.models.generate_content(
+#                 model=WORKING_MODEL,
+
+#                 contents=f"""
+# {system_prompt}
+
+# {prompt}
+# """
+#             )
+#         )
+
+#         return {
+#             "success": True,
+#             "enhanced": response.text.strip()
+#         }
+
+#     except Exception as e:
+
+#         logger.error(
+#             f"[/enhance] {e}"
+#         )
+
+#         return JSONResponse(
+#             {
+#                 "success": False,
+#                 "error": str(e)
+#             },
+#             status_code=500
+#         )
+
+
+
+
+
+
 @app.post("/enhance")
 async def enhance_prompt(
     prompt: str = Form(...)
 ):
-
     try:
 
-        client = get_genai_client()
-
         system_prompt = """
-You are an expert prompt engineer.
+You are a world-class creative strategist and prompt engineer.
 
-Improve the prompt.
-Preserve intent.
-Return ONLY improved prompt.
+Your task is to transform a rough user request into a high-quality
+video script generation brief.
+
+Rules:
+
+- Preserve the user's intent.
+- Never change the topic.
+- Expand vague requests into clearer creative directions.
+- Infer useful context when appropriate.
+- Make the request more specific, cinematic and actionable.
+- Improve clarity and structure.
+- Keep the final prompt concise enough for production use.
+- Return ONLY the improved prompt.
+- Do not explain your reasoning.
+- Do not use markdown.
 """
 
-        response = (
-            await client.aio.models.generate_content(
-                model=WORKING_MODEL,
-
-                contents=f"""
-{system_prompt}
-
-{prompt}
-"""
-            )
+        response = await anthropic_client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1000,
+            temperature=0.7,
+            system=system_prompt,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
         )
+
+        enhanced_prompt = response.content[0].text.strip()
 
         return {
             "success": True,
-            "enhanced": response.text.strip()
+            "enhanced": enhanced_prompt
         }
 
     except Exception as e:
 
-        logger.error(
-            f"[/enhance] {e}"
-        )
+        logger.error(f"[/enhance] {e}")
 
         return JSONResponse(
             {
@@ -596,6 +664,8 @@ Return ONLY improved prompt.
             },
             status_code=500
         )
+
+
 
 
 @app.post("/generate-voice")
