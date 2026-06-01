@@ -554,58 +554,6 @@ def get_context_logs():
  
 
 
-# @app.post("/enhance")
-# async def enhance_prompt(
-#     prompt: str = Form(...)
-# ):
-
-#     try:
-
-#         client = get_genai_client()
-
-#         system_prompt = """
-# You are an expert prompt engineer.
-
-# Improve the prompt.
-# Preserve intent.
-# Return ONLY improved prompt.
-# """
-
-#         response = (
-#             await client.aio.models.generate_content(
-#                 model=WORKING_MODEL,
-
-#                 contents=f"""
-# {system_prompt}
-
-# {prompt}
-# """
-#             )
-#         )
-
-#         return {
-#             "success": True,
-#             "enhanced": response.text.strip()
-#         }
-
-#     except Exception as e:
-
-#         logger.error(
-#             f"[/enhance] {e}"
-#         )
-
-#         return JSONResponse(
-#             {
-#                 "success": False,
-#                 "error": str(e)
-#             },
-#             status_code=500
-#         )
-
-
-
-
-
 
 @app.post("/enhance")
 async def enhance_prompt(
@@ -725,9 +673,10 @@ async def stream_audio(filename: str):
     return FileResponse(
         path=file_path,
         media_type="audio/wav",
-        headers={
-            "Content-Disposition": "inline"
-        }
+        # headers={
+        #     "Content-Disposition": "inline"
+        # }
+        headers={"Accept-Ranges": "none"}
     )
 
 
