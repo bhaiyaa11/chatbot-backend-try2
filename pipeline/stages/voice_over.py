@@ -1,6 +1,3 @@
-
-
-
 from pipeline.stages.base import BaseStage
 from pipeline.contracts import VoiceOverOutput
 from pipeline.llm_client import call_llm
@@ -53,25 +50,42 @@ def _build_enriched_prompt(
     preferences: dict = None,
     # retrieved_chunks: List[Dict] = None,
     semantic_inspiration: Dict = None,
+    approved_essences=None,
+    approved_interpretations=None,
+    creative_summary=None,
 ) -> str:
     blocks = []
 
-    # ── Block 0: Internal Inspirations (RAG) ────────────────────
-    # if retrieved_chunks:
-    #     inspiration_lines = []
-    #     for i, chunk in enumerate(retrieved_chunks):
-    #         ref_id = f"INT-{i+1:02d}"
-    #         type_label = chunk.get("type", "script").upper()
-    #         content = chunk.get("content", "").strip()
-    #         inspiration_lines.append(f"[{ref_id}] {type_label}: {content}")
-        
-    #     if inspiration_lines:
-    #         blocks.append(
-    #             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    #             f"INTERNAL SCRIPT INSPIRATIONS (DO NOT COPY, LEARN FROM STYLE)\n"
-    #             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    #             + "\n\n".join(inspiration_lines)
-    #         )
+    if approved_essences:
+        blocks.append(
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "APPROVED ESSENCES\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            + "\n".join(
+                f"- {e}"
+                for e in approved_essences
+            )
+        )
+
+    if approved_interpretations:
+        blocks.append(
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "APPROVED INTERPRETATIONS\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            + "\n".join(
+                f"- {i}"
+                for i in approved_interpretations
+            )
+        )
+
+    if creative_summary:
+        blocks.append(
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "APPROVED CREATIVE SUMMARY\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            + creative_summary
+        )
+
     # ── Block 0: Semantic Inspiration Engine ────────────────────
     if semantic_inspiration:
 
@@ -186,9 +200,26 @@ class VoiceOverStage(BaseStage):
         preferences: dict = None,
         # retrieved_chunks: List[Dict] = None,
         semantic_inspiration: Dict = None,
+        approved_essences=None,
+        approved_interpretations=None,
+        creative_summary=None,
     ) -> VoiceOverOutput:
 
         budget = TOKEN_BUDGETS["VOICE_OVER"]
+        logger.info(
+            f"VoiceOver approved essences: "
+            f"{len(approved_essences or [])}"
+        )
+
+        logger.info(
+            f"VoiceOver approved interpretations: "
+            f"{len(approved_interpretations or [])}"
+        )
+
+        logger.info(
+            f"VoiceOver creative summary exists: "
+            f"{bool(creative_summary)}"
+        )
 
         # Separate and trim file parts
         text_parts  = [p for p in file_parts if isinstance(p, str)]
@@ -197,6 +228,7 @@ class VoiceOverStage(BaseStage):
         if text_parts:
             per_file   = budget["file_budget"] // len(text_parts)
             text_parts = [t[:per_file] for t in text_parts]
+
 
         # ── Extract human truth before building prompt ────────────
         human_truth = None
@@ -223,6 +255,7 @@ class VoiceOverStage(BaseStage):
         print(str(semantic_inspiration)[:2000])
         print("=" * 60 + "\n")
         trimmed_prompt  = prompt[:budget["prompt_budget"]]
+
         enriched_prompt = _build_enriched_prompt(
             prompt=trimmed_prompt,
             metadata=metadata or {},
@@ -231,6 +264,12 @@ class VoiceOverStage(BaseStage):
             preferences=preferences,
             # retrieved_chunks=retrieved_chunks,
             semantic_inspiration=semantic_inspiration,
+            # approved_essences=None,
+            # approved_interpretations=None,
+            # creative_summary=None,
+            approved_essences=approved_essences,
+            approved_interpretations=approved_interpretations,
+            creative_summary=creative_summary,
         )
 
         # print(f"PROMPT SENT TO LLM:\n{enriched_prompt[:600]}...")

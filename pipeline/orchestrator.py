@@ -53,6 +53,9 @@ async def run_conversational_pipeline(
     duration: str = "",
     research_brief: dict = None,
     preferences: dict = None,
+    approved_essences=None,
+    approved_interpretations=None,
+    creative_summary=None,
 ) -> AsyncGenerator[str, None]:
 
     # ─────────────────────────────────────────────────────────────────────
@@ -123,6 +126,9 @@ async def run_conversational_pipeline(
         duration=duration,
         research_brief=research_brief,
         preferences=preferences,
+        approved_essences=approved_essences,
+        approved_interpretations=approved_interpretations,
+        creative_summary=creative_summary,
     ):
         yield chunk
 
@@ -213,8 +219,26 @@ async def run_pipeline(
     existing_script: str = None,
 
     preferences: dict = None,
+    approved_essences=None,
+    approved_interpretations=None,
+    creative_summary=None,
 
 ) -> AsyncGenerator[str, None]:
+    
+    logger.info(
+        f"Pipeline approved essences: "
+        f"{len(approved_essences or [])}"
+    )
+
+    logger.info(
+        f"Pipeline approved interpretations: "
+        f"{len(approved_interpretations or [])}"
+    )
+
+    logger.info(
+        f"Pipeline creative summary exists: "
+        f"{bool(creative_summary)}"
+    )
 
     # ─────────────────────────────────────────────────────────────────────
     # EDIT MODE
@@ -355,6 +379,14 @@ Do NOT create a new concept.
         semantic_inspiration=semantic_inspiration,
 
         preferences=preferences,
+        approved_essences=
+            approved_essences,
+
+        approved_interpretations=
+            approved_interpretations,
+
+        creative_summary=
+            creative_summary,
     )
 
     trace.append(

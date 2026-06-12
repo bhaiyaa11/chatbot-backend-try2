@@ -117,7 +117,7 @@ MODEL_ENDPOINTS = {
         "gemini-2.5-flash-lite",
     ],
     "VISUALS": [
-        "projects/poc-script-genai/locations/us-central1/endpoints/3658269249413054464",
+        "projects/poc-script-genai/locations/us-central1/endpoints/913694712437669888",
         "gemini-2.5-flash-lite",
     ],
     "CRITIC": [
