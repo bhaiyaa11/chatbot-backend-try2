@@ -2,9 +2,10 @@ from anthropic import AsyncAnthropic
 import os
 import uuid, json, logging, asyncio
 from typing import List, Optional
-from fastapi import FastAPI, UploadFile, File, Form, APIRouter, Query
+from fastapi import FastAPI, UploadFile, File, Form, APIRouter, Query, Depends, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from config import STAGE_LOCATIONS
 from ingest.file_parser import parse_files
 from pipeline.orchestrator import run_pipeline, run_conversational_pipeline
@@ -18,11 +19,18 @@ from memory.context_assembler import ContextAssembler
 from memory.summarizer import ConversationSummarizer
 from memory.vector_memory import VectorMemory
 from pydantic import BaseModel
-# from pipeline.creative_review import run_creative_review
 from pipeline.creative_review_pipeline import run_creative_review
 from pipeline.creative_review_pipeline import run_generate_script_pipeline
-from tts.tts import generate_cinematic_voiceover
+from tts.tts import generate_cinematic_voiceover, stream_audio_chunks
 import traceback
+from tts.tts import (
+    generate_narration_script,
+    generate_script_metadata,
+    build_voice_settings,
+    VOICE_AGENTS,
+    eleven_client,
+)
+from urllib.parse import unquote
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +39,32 @@ VERTEX_SEARCH_PROJECT  = "poc-script-genai"
 VERTEX_SEARCH_LOCATION = "global"
 VERTEX_SEARCH_APP_ID   = "script-research_1773405109220"
 
+# load_dotenv()
+# logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
+
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+)
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Supabase client (shared singleton)
-# ---------------------------------------------------------------------------
+
 supabase_client = create_client(
     os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY"),
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY"),
+    
+)
+from supabase import create_client as create_auth_client
+supabase_auth_client = create_auth_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY"),  # must be the service_role key, not anon
 )
 
 # ---------------------------------------------------------------------------
@@ -58,6 +82,26 @@ context_assembler    = ContextAssembler(
 anthropic_client = AsyncAnthropic(
     api_key=os.getenv("ANTHROPIC_API_KEY")
 )
+
+
+
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+
+# Then get_current_user uses supabase_client directly:
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
+) -> str:
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    try:
+        response = supabase_client.auth.get_user(credentials.credentials)
+        if not response or not response.user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return response.user.id
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Auth error: {e}")
 
 # ---------------------------------------------------------------------------
 # FastAPI app
@@ -96,8 +140,6 @@ async def health():
 
 # ---------------------------------------------------------------------------
 # /creative-review
-# Frontend sends FormData (not JSON), so all fields are Form() params.
-# Returns a review_id plus creative guidance for the user to approve.
 # ---------------------------------------------------------------------------
 @app.post("/creative-review")
 async def creative_review_endpoint(
@@ -111,11 +153,6 @@ async def creative_review_endpoint(
     conversation_id:  str   = Form(""),
     files: Optional[List[UploadFile]] = File(None),
 ):
-    """
-    Stage 1 of the two-step creative flow:
-    Run niche research + creative interpretation, return a review payload
-    the frontend presents to the user for approval before generating the script.
-    """
     try:
         metadata = {
             "client":        client,
@@ -124,7 +161,6 @@ async def creative_review_endpoint(
             "video_tone":    video_tone,
             "duration":      duration,
         }
-        # Strip empty values so downstream code doesn't see empty strings
         metadata = {k: v for k, v in metadata.items() if v}
 
         file_parts = await parse_files(files or [], stage="NICHE_RESEARCH")
@@ -136,8 +172,6 @@ async def creative_review_endpoint(
             file_parts=file_parts,
         )
 
-        # run_creative_review must return a dict with at least {"review_id": ...}
-        # return JSONResponse(result)
         return JSONResponse({
             "review_id":            str(uuid.uuid4()),
             "retrievals":           [],
@@ -157,7 +191,9 @@ async def creative_review_endpoint(
 
 
 # ---------------------------------------------------------------------------
-# /chat — conversational script generation (original flow, unchanged)
+# /chat — conversational script generation
+# user_id now comes from the JWT (Authorization header) instead of Form field.
+# The Form("anonymous") fallback is kept for backward compat during migration.
 # ---------------------------------------------------------------------------
 @app.post("/chat")
 async def chat(
@@ -171,12 +207,13 @@ async def chat(
     duration:         str   = Form(""),
     research_id:      str   = Form(""),
     research_brief:   str   = Form(""),
-    user_id:          str   = Form("anonymous"),
     creativity_ratio: float = Form(0.5),
     approved_essences:        str = Form("[]"),
     approved_interpretations: str = Form("[]"),
     creative_summary:         str = Form(""),
     files: Optional[List[UploadFile]] = File(None),
+    # JWT-derived user_id — falls back to "anonymous" if no token sent
+    user_id: str = Depends(get_current_user),
 ):
     trace_id      = str(uuid.uuid4())[:8]
     pipeline_trace = []
@@ -194,18 +231,11 @@ async def chat(
         except Exception:
             logger.warning(f"[{trace_id}] Could not parse research_brief JSON")
 
-    parsed_approved_essences        = json.loads(approved_essences)
-    logger.info(
-        f"Approved essences received: "
-        f"{len(parsed_approved_essences)}"
-    )
+    parsed_approved_essences = json.loads(approved_essences)
+    logger.info(f"Approved essences received: {len(parsed_approved_essences)}")
 
-   
     parsed_approved_interpretations = json.loads(approved_interpretations)
-    logger.info(
-        f"Approved interpretations received: "
-        f"{len(parsed_approved_interpretations)}"
-    )
+    logger.info(f"Approved interpretations received: {len(parsed_approved_interpretations)}")
 
     metadata = {k: v for k, v in {
         "client":        client,
@@ -218,6 +248,7 @@ async def chat(
     conversation = await conversation_manager.get_or_create_conversation(
         conversation_id=conversation_id or None,
         metadata=metadata,
+        user_id=user_id,
     )
     conv_id = conversation.id
     logger.info(f"[{trace_id}] Conversation: {conv_id} (msgs={conversation.message_count})")
@@ -234,7 +265,13 @@ async def chat(
         metadata=user_message_metadata,
         user_id=user_id,
     )
-
+# Set title only once when conversation is new
+    if not conversation.title:
+        await conversation_manager.update_conversation_title(
+            conv_id,
+            prompt[:60].strip()
+        )
+        
     context = await context_assembler.assemble(
         conversation_id=conv_id,
         current_prompt=prompt,
@@ -273,7 +310,6 @@ async def chat(
                 combined_output = "\n".join(full_output).strip()
                 if combined_output:
                     msg_type = "script_edit" if context.last_script else "script_generation"
-
                     assistant_msg = await conversation_manager.save_message(
                         conversation_id=conv_id,
                         role="assistant",
@@ -291,10 +327,6 @@ async def chat(
 
     return StreamingResponse(stream(), media_type="text/plain")
 
-
-# ---------------------------------------------------------------------------
-# Background memory tasks (shared by /chat and /generate-script)
-# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # /edit — lightweight inline text editing
@@ -412,7 +444,6 @@ async def get_messages(
     limit: int = Query(20, ge=1, le=100, description="Messages per page"),
 ):
     try:
-        # Accept either conversation_id or chat_id
         target_id = conversation_id or chat_id
         if not target_id:
             return JSONResponse(
@@ -421,8 +452,6 @@ async def get_messages(
             )
 
         offset = (page - 1) * limit
-
-        # Use conversation_id column if available, fall back to chat_id
         filter_column = "conversation_id" if conversation_id else "chat_id"
 
         response = (
@@ -437,8 +466,6 @@ async def get_messages(
 
         messages = response.data or []
         has_more = len(messages) == limit
-
-        # Reverse so frontend receives oldest → newest order
         messages.reverse()
 
         return {
@@ -453,15 +480,22 @@ async def get_messages(
             {"messages": [], "page": page, "limit": limit, "has_more": False, "error": str(e)},
             status_code=500,
         )
+
+
 # ---------------------------------------------------------------------------
-# /conversations — CRUD
+# /conversations — CRUD (all filtered by authenticated user_id)
 # ---------------------------------------------------------------------------
 @app.get("/conversations")
 async def list_conversations(
-    limit:  int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
+    limit:   int = Query(20, ge=1, le=100),
+    offset:  int = Query(0, ge=0),
+    user_id: str = Depends(get_current_user),
 ):
-    conversations = await conversation_manager.list_conversations(limit=limit, offset=offset)
+    conversations = await conversation_manager.list_conversations(
+        limit=limit,
+        offset=offset,
+        user_id=user_id,
+    )
     return {
         "conversations": [
             {
@@ -478,10 +512,17 @@ async def list_conversations(
 
 
 @app.get("/conversations/{conv_id}")
-async def get_conversation(conv_id: str):
+async def get_conversation(
+    conv_id: str,
+    user_id: str = Depends(get_current_user),
+):
     conv = await conversation_manager.get_conversation(conv_id)
     if not conv:
         return JSONResponse({"error": "Conversation not found"}, status_code=404)
+
+    # Ownership check — prevent users from reading each other's conversations
+    if hasattr(conv, "user_id") and conv.user_id and conv.user_id != user_id:
+        return JSONResponse({"error": "Forbidden"}, status_code=403)
 
     summary_data = await summarizer.get_latest_summary(conv_id)
 
@@ -497,7 +538,15 @@ async def get_conversation(conv_id: str):
 
 
 @app.delete("/conversations/{conv_id}")
-async def archive_conversation(conv_id: str):
+async def archive_conversation(
+    conv_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    # Ownership check before archiving
+    conv = await conversation_manager.get_conversation(conv_id)
+    if conv and hasattr(conv, "user_id") and conv.user_id and conv.user_id != user_id:
+        return JSONResponse({"error": "Forbidden"}, status_code=403)
+
     success = await conversation_manager.archive_conversation(conv_id)
     if success:
         return {"status": "archived"}
@@ -553,38 +602,108 @@ Rules:
 # ---------------------------------------------------------------------------
 # /generate-voice — TTS
 # ---------------------------------------------------------------------------
+
+
+from fastapi import BackgroundTasks
+from fastapi.responses import JSONResponse
+import uuid
+import os
+
+OUTPUT_DIR = "generated_audio"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 @app.post("/generate-voice")
 async def generate_voice(data: VoiceRequest):
-    try:
-        logger.info("VOICE REQUEST RECEIVED")
-        result    = await generate_cinematic_voiceover(
-            final_script=data.script,
-            voice_type=data.voice_type,
-        )
-        audio_path = result["final_audio"]
-        filename   = os.path.basename(audio_path)
-        audio_url  = f"/audio/{filename}"
-        return JSONResponse({"success": True, "audio_url": audio_url})
 
-    except Exception as e:
-        logger.error(f"[/generate-voice] {e}")
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+    file_id = str(uuid.uuid4())
+    filename = f"{file_id}.mp3"
 
+    output_path = os.path.join(
+        OUTPUT_DIR,
+        filename
+    )
+
+    narration_script = await generate_narration_script(
+        data.script
+    )
+
+    metadata = await generate_script_metadata(
+        narration_script
+    )
+
+    voice_agent = VOICE_AGENTS[data.voice_type]
+
+    voice_settings = build_voice_settings(
+        metadata
+    )
+
+    audio_bytes = b""
+
+    async for chunk in eleven_client.text_to_speech.convert(
+        voice_id=voice_agent["voice_id"],
+        model_id="eleven_flash_v2_5",
+        text=narration_script,
+        output_format="mp3_44100_128",
+        voice_settings=voice_settings,
+    ):
+        if chunk:
+            audio_bytes += chunk
+
+    with open(output_path, "wb") as f:
+        f.write(audio_bytes)
+
+    return {
+        "success": True,
+        "audio_url": f"/audio/{filename}"
+    }
 
 @app.get("/audio/{filename}")
-async def stream_audio(filename: str):
-    file_path = os.path.join("generated_audio", filename)
-    if not os.path.exists(file_path):
-        return JSONResponse({"success": False, "error": "Audio file not found"}, status_code=404)
+async def get_audio(filename: str):
+
+    path = os.path.join(
+        OUTPUT_DIR,
+        filename
+    )
+
     return FileResponse(
-        path=file_path,
-        media_type="audio/wav",
-        headers={"Accept-Ranges": "none"},
+        path,
+        media_type="audio/mpeg"
     )
 
 
+# @app.get("/audio-stream")
+# async def audio_stream(
+#     script: str,
+#     voice_type: str,
+# ):
+#     return StreamingResponse(
+#         generate_cinematic_voiceover_stream(
+#             final_script=unquote(script),
+#             voice_type=voice_type,
+#         ),
+#         media_type="audio/mpeg",
+#         headers={
+#             "Cache-Control": "no-cache",
+#             "Connection": "keep-alive",
+#         },
+#     )
+
+
+# @app.post("/generate-voice-stream")
+# async def generate_voice_stream(data: VoiceRequest):
+
+#     return StreamingResponse(
+#         generate_cinematic_voiceover_stream(
+#             final_script=data.script,
+#             voice_type=data.voice_type,
+#         ),
+#         media_type="audio/mpeg",
+#     )
+
+
+
 # ---------------------------------------------------------------------------
-# /fact-check — factual accuracy check for script canvas
+# /fact-check
 # ---------------------------------------------------------------------------
 _FACT_CHECK_SYSTEM_PROMPT = """You are a professional fact-checker reviewing a video script.
 Identify every factual claim — statistics, dates, named entities, product/company facts, scientific assertions, historical events.
@@ -625,7 +744,6 @@ async def fact_check(data: FactCheckRequest):
 
         raw = response.content[0].text.strip()
 
-        # Strip markdown fences — model ignores "no backticks" instruction
         import re
         clean = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
         clean = re.sub(r"\s*```$", "", clean).strip()
@@ -640,6 +758,5 @@ async def fact_check(data: FactCheckRequest):
         logger.error(f"[/fact-check] Error: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
     
-
 
 # uvicorn api.index:app --reload

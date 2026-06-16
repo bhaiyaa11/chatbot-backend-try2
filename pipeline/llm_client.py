@@ -2,6 +2,17 @@ import json, time, asyncio, logging, random
 from google import genai
 from config import MODEL_ENDPOINTS, MAX_RETRIES, get_genai_client
 from pipeline.cache import cache
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from anthropic import AsyncAnthropic
+import os
+
+anthropic_client = AsyncAnthropic(
+    api_key=os.getenv("ANTHROPIC_API_KEY")
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -145,10 +156,29 @@ async def stream_llm(stage: str, contents: list):
                 model=model_id,
                 contents=contents
             )
-            async for chunk in stream:
-                if chunk.text:
-                    yield chunk.text
-            return  # success — stop trying endpoints
+            # async for chunk in stream:
+            #     if chunk.text:
+            #         yield chunk.text
+            # return  # success — stop trying endpoints
+            if stage == "CRITIC":
+
+                stream = await anthropic_client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=4000,
+                    stream=True,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": "\n\n".join(str(x) for x in contents)
+                        }
+                    ]
+                )
+
+                async for event in stream:
+                    if event.type == "content_block_delta":
+                        yield event.delta.text
+
+                return
 
         except Exception as e:
             if _is_quota_error(e):

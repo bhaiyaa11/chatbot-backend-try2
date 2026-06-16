@@ -1,4 +1,15 @@
 import os, base64, json, tempfile
+from dotenv import load_dotenv
+
+load_dotenv()
+from anthropic import AsyncAnthropic
+import os
+
+
+anthropic_client = AsyncAnthropic(
+    api_key=os.getenv("ANTHROPIC_API_KEY")
+)
+
 
 SYSTEM_PROMPTS = {
 
@@ -121,8 +132,9 @@ MODEL_ENDPOINTS = {
         "gemini-2.5-flash-lite",
     ],
     "CRITIC": [
-        "projects/poc-script-genai/locations/global/publishers/google/models/gemini-3-flash-preview",
-        "gemini-2.5-flash-lite",
+        # "projects/poc-script-genai/locations/global/publishers/google/models/gemini-3-flash-preview",
+        # "gemini-2.5-flash-lite",
+        "claude-sonnet-4-6",
     ],
 }
 

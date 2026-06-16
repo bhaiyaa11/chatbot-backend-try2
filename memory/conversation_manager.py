@@ -31,6 +31,7 @@ class Conversation:
     updated_at: Optional[str] = None
     message_count: int = 0
     is_archived: bool = False
+    user_id: Optional[str] = None  # ADDED: ownership field
 
 
 @dataclass
@@ -89,7 +90,8 @@ class ConversationManager:
         self,
         conversation_id: Optional[str],
         metadata: dict = None,
-    ) -> Conversation:
+        user_id: Optional[str] = None,  # ADDED: stamp owner at creation
+    ) -> "Conversation":
         """
         Get an existing conversation or create a new one.
         
@@ -105,9 +107,10 @@ class ConversationManager:
         return await self._create_conversation(
             conversation_id=conversation_id,
             metadata=metadata or {},
+            user_id=user_id,
         )
 
-    async def get_conversation(self, conversation_id: str) -> Optional[Conversation]:
+    async def get_conversation(self, conversation_id: str) -> Optional["Conversation"]:
         """Fetch a conversation by ID. Returns None if not found."""
         try:
             res = (
@@ -128,18 +131,21 @@ class ConversationManager:
         self,
         conversation_id: Optional[str] = None,
         metadata: dict = None,
-    ) -> Conversation:
+        user_id: Optional[str] = None,  # ADDED
+    ) -> "Conversation":
         """Create a new conversation row."""
         row: dict[str, Any] = {
             "metadata": metadata or {},
         }
         if conversation_id:
             row["id"] = conversation_id
+        if user_id and self._is_valid_uuid(user_id):  # ADDED: persist owner
+            row["user_id"] = user_id
 
         try:
             res = self._client.table("conversations").insert(row).execute()
             conv = self._to_conversation(res.data[0])
-            logger.info(f"[ConversationManager] Created conversation {conv.id}")
+            logger.info(f"[ConversationManager] Created conversation {conv.id} (user={user_id})")
             return conv
         except Exception as e:
             logger.error(f"[ConversationManager] Failed to create conversation: {e}")
@@ -175,8 +181,13 @@ class ConversationManager:
         limit: int = 20,
         offset: int = 0,
         include_archived: bool = False,
-    ) -> list[Conversation]:
-        """List conversations ordered by most recent activity."""
+        user_id: Optional[str] = None,  # ADDED: filter by owner
+    ) -> list:
+        """List conversations ordered by most recent activity.
+        
+        When user_id is provided, only returns conversations owned by that user.
+        This is the key change that prevents users seeing each other's history.
+        """
         try:
             query = (
                 self._client.table("conversations")
@@ -186,7 +197,11 @@ class ConversationManager:
             )
             if not include_archived:
                 query = query.eq("is_archived", False)
-            
+
+            # ADDED: the critical filter — scope results to this user only
+            if user_id and self._is_valid_uuid(user_id):
+                query = query.eq("user_id", user_id)
+
             res = query.execute()
             return [self._to_conversation(row) for row in (res.data or [])]
         except Exception as e:
@@ -218,7 +233,7 @@ class ConversationManager:
         metadata: dict = None,
         chat_id: str = None,
         user_id: str = None,
-    ) -> Message:
+    ) -> "Message":
         """
         Save a message to the messages table.
         
@@ -258,7 +273,7 @@ class ConversationManager:
         self,
         conversation_id: str,
         limit: int = 15,
-    ) -> list[Message]:
+    ) -> list:
         """
         Get the most recent messages for a conversation.
         Returns in chronological order (oldest first).
@@ -338,7 +353,7 @@ class ConversationManager:
         conversation_id: str,
         start_time: str,
         end_time: str,
-    ) -> list[Message]:
+    ) -> list:
         """Get messages within a time range. Used by the summarizer."""
         try:
             res = (
@@ -400,7 +415,7 @@ class ConversationManager:
         return len(text) // 4 if text else 0
 
     @staticmethod
-    def _to_conversation(row: dict) -> Conversation:
+    def _to_conversation(row: dict) -> "Conversation":
         return Conversation(
             id=row["id"],
             title=row.get("title"),
@@ -409,10 +424,11 @@ class ConversationManager:
             updated_at=row.get("updated_at"),
             message_count=row.get("message_count", 0),
             is_archived=row.get("is_archived", False),
+            user_id=row.get("user_id"),  # ADDED: read owner from DB row
         )
 
     @staticmethod
-    def _to_message(row: dict) -> Message:
+    def _to_message(row: dict) -> "Message":
         return Message(
             id=row["id"],
             conversation_id=row.get("conversation_id", ""),
