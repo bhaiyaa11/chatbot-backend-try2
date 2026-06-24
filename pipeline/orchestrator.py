@@ -48,6 +48,9 @@ async def run_conversational_pipeline(
     trace: list,
     client: str = "",
     business_unit: str = "",
+    styles: str = "",
+    industries: str = "",
+    serviceLines: str = "",
     video_type: str = "",
     video_tone: str = "",
     duration: str = "",
@@ -121,6 +124,9 @@ async def run_conversational_pipeline(
         trace=trace,
         client=client,
         business_unit=business_unit,
+        styles=styles,
+        industries=industries,
+        serviceLines=serviceLines,
         video_type=video_type,
         video_tone=video_tone,
         duration=duration,
@@ -209,6 +215,9 @@ async def run_pipeline(
 
     client: str = "",
     business_unit: str = "",
+    styles: str = "",
+    industries: str = "",
+    serviceLines: str = "",
     video_type: str = "",
     video_tone: str = "",
     duration: str = "",
@@ -283,6 +292,9 @@ Do NOT create a new concept.
     metadata = {
         "client": client,
         "business_unit": business_unit,
+        "styles": styles,
+        "industries": industries,
+        "serviceLines": serviceLines,
         "video_type": video_type,
         "video_tone": video_tone,
         "duration": duration,
@@ -482,6 +494,9 @@ Do NOT create a new concept.
             "client": client,
 
             "business_unit": business_unit,
+            "styles": styles,
+            "industries": industries,
+            "serviceLines": serviceLines,
 
             "video_type": video_type,
 

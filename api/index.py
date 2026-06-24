@@ -148,6 +148,10 @@ async def creative_review_endpoint(
     business_unit:    str   = Form(""),
     video_type:       str   = Form(""),
     video_tone:       str   = Form(""),
+    styles:           str   =Form(""),
+    industries:       str   = Form(""),
+    serviceLines:     str   = Form(""),
+    
     duration:         str   = Form(""),
     creativity_ratio: float = Form(0.5),
     conversation_id:  str   = Form(""),
@@ -157,6 +161,9 @@ async def creative_review_endpoint(
         metadata = {
             "client":        client,
             "business_unit": business_unit,
+            "styles":        styles,
+            "industries":    industries,
+            "serviceLines":  serviceLines,
             "video_type":    video_type,
             "video_tone":    video_tone,
             "duration":      duration,
@@ -202,6 +209,9 @@ async def chat(
     conversation_id:  str   = Form(""),
     client:           str   = Form(""),
     business_unit:    str   = Form(""),
+    styles:           str   = Form(""),
+    industries:       str   = Form(""),
+    serviceLines:     str   = Form(""),
     video_type:       str   = Form(""),
     video_tone:       str   = Form(""),
     duration:         str   = Form(""),
@@ -240,6 +250,9 @@ async def chat(
     metadata = {k: v for k, v in {
         "client":        client,
         "business_unit": business_unit,
+        "styles":        styles,
+        "industries":    industries,
+        "serviceLines":  serviceLines,
         "video_type":    video_type,
         "video_tone":    video_tone,
         "duration":      duration,
@@ -290,6 +303,9 @@ async def chat(
                 trace=pipeline_trace,
                 client=client,
                 business_unit=business_unit,
+                styles=styles,
+                industries=industries,
+                serviceLines=serviceLines,
                 video_type=video_type,
                 video_tone=video_tone,
                 duration=duration,
@@ -383,6 +399,9 @@ async def feedback(
 async def run_research(
     client:           str   = Form(""),
     business_unit:    str   = Form(""),
+    styles:           str   = Form(""),
+    industries:       str   = Form(""),
+    serviceLines:     str   = Form(""),
     video_type:       str   = Form(""),
     video_tone:       str   = Form(""),
     duration:         str   = Form(""),
@@ -393,6 +412,9 @@ async def run_research(
     metadata = {
         "client":        client,
         "business_unit": business_unit,
+        "styles": styles,
+        "industries": industries,
+        "serviceLines": serviceLines,
         "video_type":    video_type,
         "video_tone":    video_tone,
         "duration":      duration,
@@ -669,37 +691,6 @@ async def get_audio(filename: str):
         path,
         media_type="audio/mpeg"
     )
-
-
-# @app.get("/audio-stream")
-# async def audio_stream(
-#     script: str,
-#     voice_type: str,
-# ):
-#     return StreamingResponse(
-#         generate_cinematic_voiceover_stream(
-#             final_script=unquote(script),
-#             voice_type=voice_type,
-#         ),
-#         media_type="audio/mpeg",
-#         headers={
-#             "Cache-Control": "no-cache",
-#             "Connection": "keep-alive",
-#         },
-#     )
-
-
-# @app.post("/generate-voice-stream")
-# async def generate_voice_stream(data: VoiceRequest):
-
-#     return StreamingResponse(
-#         generate_cinematic_voiceover_stream(
-#             final_script=data.script,
-#             voice_type=data.voice_type,
-#         ),
-#         media_type="audio/mpeg",
-#     )
-
 
 
 # ---------------------------------------------------------------------------

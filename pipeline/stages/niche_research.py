@@ -52,6 +52,9 @@ a video they want to create. Extract the key entities needed for research.
 User prompt: {prompt}
 Client field: {client}
 Business unit: {business_unit}
+Industry: {industries}
+Service lines: {serviceLines}
+
 
 Return STRICTLY as JSON — no fences:
 {{
@@ -94,6 +97,8 @@ Generate targeted search queries for this campaign brief.
 Client: {client}
 Project: {project_name}
 Industry: {business_unit}
+Industry: {industries}
+Service lines: {serviceLines}
 Buyer Persona: {buyer_persona}
 Video Type: {video_type}
 Tone: {video_tone}
@@ -159,7 +164,8 @@ NICHE RESEARCH (buyer pain points, hooks, competitor landscape from real content
 Campaign Brief:
 Client: {client}
 Project: {project_name}
-Industry: {business_unit}
+Industry: {industries}
+Service lines: {serviceLines}
 Video Type: {video_type}
 Tone: {video_tone}
 
@@ -330,6 +336,9 @@ async def _extract_project_intelligence(metadata: dict ,file_parts: list = None)
     prompt_text   = metadata.get("prompt", "")
     client        = metadata.get("client", "")
     business_unit = metadata.get("business_unit", "")
+    industries =metadata.get("industries", "")
+    serviceLines = metadata.get("serviceLines", "")
+
 
     # ── Step 1: Extract entities from prompt ─────────────────────
     logger.info("[NicheResearch] Extracting project entities from prompt...")
@@ -338,6 +347,8 @@ async def _extract_project_intelligence(metadata: dict ,file_parts: list = None)
             prompt=prompt_text,
             client=client,
             business_unit=business_unit,
+            industries=industries,
+            serviceLines=serviceLines,
         )
     )
 
@@ -347,7 +358,10 @@ async def _extract_project_intelligence(metadata: dict ,file_parts: list = None)
         entities = {
             "company_name":   client,
             "project_name":   prompt_text[:60],
-            "industry":       business_unit,
+            # "industry":       business_unit,
+            "serviceLines":    serviceLines,
+            "industry":        industries,
+            
             "buyer_persona":  "Business decision maker",
             "search_queries": [f"{client} {prompt_text[:50]}"]
         }
@@ -662,6 +676,8 @@ class NicheResearchStage:
                     client=metadata.get("client", "Unknown"),
                     project_name=entities.get("project_name", ""),
                     business_unit=metadata.get("business_unit", "Unknown"),
+                    industries=metadata.get("industries", ""),
+                    serviceLines=metadata.get("serviceLines", ""),
                     buyer_persona=entities.get("buyer_persona", "Business leader"),
                     video_type=metadata.get("video_type", "Unknown"),
                     video_tone=metadata.get("video_tone", "Unknown"),
@@ -697,6 +713,8 @@ class NicheResearchStage:
                     client=metadata.get("client", "Unknown"),
                     project_name=entities.get("project_name", ""),
                     business_unit=metadata.get("business_unit", "Unknown"),
+                    industries=metadata.get("industries", ""),
+                    serviceLines=metadata.get("serviceLines", ""),
                     video_type=metadata.get("video_type", "Unknown"),
                     video_tone=metadata.get("video_tone", "Unknown"),
                 )

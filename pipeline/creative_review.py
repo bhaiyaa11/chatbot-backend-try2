@@ -7,6 +7,9 @@ class CreativeReviewRequest(BaseModel):
 
     client: str = ""
     business_unit: str = ""
+    industries: str =""
+    styles: str=""
+    serviceLines: str = ""
     video_type: str = ""
     video_tone: str = ""
     duration: str = ""

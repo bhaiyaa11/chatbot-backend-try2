@@ -120,7 +120,8 @@ def _build_enriched_prompt(
         blocks.append(
             f"CAMPAIGN BRIEF:\n"
             f"Client: {metadata.get('client', '')}\n"
-            f"Industry / Business Unit: {metadata.get('business_unit', '')}\n"
+            f"Industry / Business Unit: {metadata.get('industries', '')}\n"
+            f"Service Lines: {metadata.get('serviceLines', '')}\n"
             f"Video Type: {metadata.get('video_type', '')}\n"
             f"Tone: {metadata.get('video_tone', '')}\n"
             f"Duration: {metadata.get('duration', '')}"

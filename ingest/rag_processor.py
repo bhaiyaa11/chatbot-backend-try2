@@ -94,7 +94,7 @@ class RAGProcessor:
     async def process_and_ingest(self, script_data: Dict):
         """
         Main entry point for ingestion.
-        script_data keys: content, client, business_unit, video_type, tone, chunks (List[Dict])
+        script_data keys: content, client,serviceLines, styles, industries, business_unit, video_type, tone, chunks (List[Dict])
         """
         content = script_data.get("content", "")
         content_hash = self._generate_hash(content)
@@ -107,6 +107,9 @@ class RAGProcessor:
         script_row = {
             "content": content,
             "client": script_data.get("client"),
+            "serviceLines": script_data.get("serviceLines"),
+            "styles": script_data.get("styles"),
+            "industries": script_data.get("industries"),
             "business_unit": script_data.get("business_unit"),
             "video_type": script_data.get("video_type"),
             "tone": script_data.get("tone"),
