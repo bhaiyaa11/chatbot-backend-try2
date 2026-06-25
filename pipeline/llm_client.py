@@ -121,29 +121,87 @@ async def call_llm(stage: str, contents: list) -> tuple[dict, int, bool]:
 
 
 
+# async def generate_text(stage: str, contents: list) -> str:
+#     """
+#     Non-JSON LLM call.
+#     Returns raw text (used for edit mode).
+#     """
+#     endpoints = MODEL_ENDPOINTS[stage]
+
+#     for endpoint in endpoints:
+#         client, model_id = _get_client_and_model(stage, endpoint)
+#         try:
+#             response = await client.aio.models.generate_content(
+#                 model=model_id,
+#                 contents=contents
+#             )
+#             return (response.text or "").strip()
+
+#         except Exception as e:
+#             if _is_quota_error(e):
+#                 logger.warning(f"[generate_text/{stage}] Quota on {endpoint}, trying fallback")
+#                 continue
+#             raise
+
+#     raise RuntimeError(f"[{stage}] Failed to generate text (non-JSON mode)")
+
+
+
 async def generate_text(stage: str, contents: list) -> str:
     """
     Non-JSON LLM call.
-    Returns raw text (used for edit mode).
+    Uses Anthropic directly for CRITIC.
+    Uses Google GenAI / Vertex AI for all other stages.
     """
+
+    # ── Anthropic CRITIC ──────────────────────────────────────────
+    if stage == "CRITIC":
+        try:
+            response = await anthropic_client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=4000,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "\n\n".join(str(x) for x in contents),
+                    }
+                ],
+            )
+
+            return "".join(
+                block.text
+                for block in response.content
+                if block.type == "text"
+            ).strip()
+
+        except Exception as e:
+            logger.error(f"[generate_text/CRITIC] Anthropic error: {e}")
+            raise RuntimeError(f"CRITIC generation failed: {e}")
+
+    # ── Google models for all other stages ─────────────────────────
     endpoints = MODEL_ENDPOINTS[stage]
 
     for endpoint in endpoints:
         client, model_id = _get_client_and_model(stage, endpoint)
+
         try:
             response = await client.aio.models.generate_content(
                 model=model_id,
-                contents=contents
+                contents=contents,
             )
             return (response.text or "").strip()
 
         except Exception as e:
             if _is_quota_error(e):
-                logger.warning(f"[generate_text/{stage}] Quota on {endpoint}, trying fallback")
+                logger.warning(
+                    f"[generate_text/{stage}] Quota on {endpoint}, trying fallback"
+                )
                 continue
             raise
 
     raise RuntimeError(f"[{stage}] Failed to generate text (non-JSON mode)")
+
+
 
 async def stream_llm(stage: str, contents: list):
     """Async generator yielding raw text chunks. Used for final streaming stage."""
