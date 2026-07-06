@@ -197,6 +197,7 @@ async def creative_review_endpoint(
         )
 
 
+
 # ---------------------------------------------------------------------------
 # /chat — conversational script generation
 # user_id now comes from the JWT (Authorization header) instead of Form field.
@@ -583,11 +584,21 @@ def get_context_logs():
     return get_logs()
 
 
+
 # ---------------------------------------------------------------------------
 # /enhance — prompt enhancer
 # ---------------------------------------------------------------------------
 @app.post("/enhance")
-async def enhance_prompt(prompt: str = Form(...)):
+async def enhance_prompt(
+    prompt:        str = Form(...),
+    client:        str = Form(""),
+    video_type:    str = Form(""),
+    video_tone:    str = Form(""),
+    duration:      str = Form(""),
+    styles:        str = Form(""),
+    industries:    str = Form(""),
+    serviceLines:  str = Form(""),
+):
     try:
         system_prompt = """
 You are a world-class creative strategist and prompt engineer.
@@ -599,20 +610,41 @@ Rules:
 - Preserve the user's intent.
 - Never change the topic.
 - Expand vague requests into clearer creative directions.
-- Infer useful context when appropriate.
+- Weave in the provided campaign parameters (client, video type, tone,
+  duration, styles, industries, service lines) naturally — do not just
+  list them, integrate them into the creative direction.
 - Make the request more specific, cinematic and actionable.
 - Improve clarity and structure.
-- Keep the final prompt concise enough for production use.
+- STRICT LENGTH LIMIT: output must be 4-5 lines maximum. Do not exceed this.
 - Return ONLY the improved prompt.
 - Do not explain your reasoning.
 - Do not use markdown.
 """
+
+        context_lines = []
+        if client:        context_lines.append(f"Client: {client}")
+        if video_type:    context_lines.append(f"Video Type: {video_type}")
+        if video_tone:    context_lines.append(f"Tone: {video_tone}")
+        if duration:      context_lines.append(f"Duration: {duration}")
+        if styles:        context_lines.append(f"Styles: {styles}")
+        if industries:    context_lines.append(f"Industries: {industries}")
+        if serviceLines:  context_lines.append(f"Service Lines: {serviceLines}")
+
+        context_block = "\n".join(context_lines)
+
+        user_message = (
+            f"CAMPAIGN PARAMETERS:\n{context_block}\n\n"
+            f"USER REQUEST:\n{prompt}"
+            if context_block
+            else prompt
+        )
+
         response = await anthropic_client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=1000,
+            max_tokens=300,
             temperature=0.7,
             system=system_prompt,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": user_message}],
         )
         return {"success": True, "enhanced": response.content[0].text.strip()}
 
@@ -749,5 +781,38 @@ async def fact_check(data: FactCheckRequest):
         logger.error(f"[/fact-check] Error: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
     
+
+
+from faster_whisper import WhisperModel
+
+whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
+import tempfile
+
+# ---------------------------------------------------------------------------
+# /transcribe — local Whisper STT for voice-to-prompt input
+# ---------------------------------------------------------------------------
+@app.post("/transcribe")
+async def transcribe(audio: UploadFile = File(...)):
+    try:
+        contents = await audio.read()
+        if not contents:
+            return JSONResponse({"text": "", "error": "Empty audio file"}, status_code=400)
+
+        suffix = os.path.splitext(audio.filename or "")[1] or ".webm"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(contents)
+            tmp_path = tmp.name
+
+        try:
+            segments, info = whisper_model.transcribe(tmp_path, language="en")
+            text = " ".join(seg.text.strip() for seg in segments)
+            return {"text": text.strip()}
+        finally:
+            os.remove(tmp_path)
+
+    except Exception as e:
+        logger.error(f"[/transcribe] Error: {e}")
+        traceback.print_exc()
+        return JSONResponse({"text": "", "error": str(e)}, status_code=500)
 
 # uvicorn api.index:app --reload

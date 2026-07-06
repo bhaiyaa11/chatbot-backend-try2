@@ -45,10 +45,15 @@ You are an elite B2B video scriptwriter. You will receive:
 2. A fact-check report identifying specific issues
 3. A project brief with verified facts
 4. Few-shot examples of high-rated scripts
+5. NO EM DASHES in your output
 
-Rewrite the script fixing ALL issues in the fact-check report.
+Rewrite the script fixing ONLY the issues in the fact-check report.
+Do NOT change the narrative arc, tone, pacing, or ending. If the draft
+is structured to stay unresolved, ambiguous, ironic, or open-ended,
+preserve that structure exactly — fix facts and wording only, not the story shape.
 
 You MUST output ONLY a valid markdown table.
+
 
 STRICT RULES:
 - Output MUST start with "|"
@@ -58,6 +63,7 @@ STRICT RULES:
 - NO explanations
 - NO JSON
 - NO markdown code blocks
+- NO EM DASHES "-" in the response generated 
 
 EXACT format:
 | Time (s) | Voice Over | Visuals |
@@ -78,6 +84,7 @@ class CriticStage(BaseStage):
         file_parts: list,
         metadata: dict = None,
         research_brief: dict = None,
+        is_human_reviewed: bool = False,   # ← new param
     ) -> str:
         budget = TOKEN_BUDGETS["CRITIC"]
         media_parts = [p for p in file_parts if not isinstance(p, str)]
@@ -182,12 +189,13 @@ class CriticStage(BaseStage):
         # Otherwise run base Gemini to format original into table
         system_prompt = SYSTEM_PROMPTS["CRITIC"]
         if not should_rewrite:
-            examples = await get_few_shot_examples(limit=2)
-            if examples:
-                system_prompt += (
-                    f"\n\nHere are examples of scripts users rated highly. "
-                    f"Use these as your quality benchmark:\n{examples}"
-                )
+             if not is_human_reviewed:   
+                examples = await get_few_shot_examples(limit=2)
+                if examples:
+                    system_prompt += (
+                        f"\n\nHere are examples of scripts users rated highly. "
+                        f"Use these as your quality benchmark:\n{examples}"
+                    )
 
         contents = [system_prompt] + media_parts + [rewritten_combined]
 

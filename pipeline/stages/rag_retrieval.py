@@ -57,7 +57,7 @@ class RAGRetrievalStage(BaseStage):
         # ── 2. Build metadata filter (drop None/empty values) ────────────
         metadata_filter: Dict = {}
         if metadata:
-            for key in ("client", "business_unit", "video_type", "industries", "serviceLines"):
+            for key in ("client", "video_type", "industries", "serviceLines",  "styles", "tone", "duration",):
                 val = metadata.get(key)
                 if val:
                     metadata_filter[key] = val

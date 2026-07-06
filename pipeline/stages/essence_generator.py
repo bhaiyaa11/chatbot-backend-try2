@@ -6,21 +6,6 @@ client = AsyncAnthropic(
     api_key=os.getenv("ANTHROPIC_API_KEY")
 )
 
-# PROMPT = """
-# You are a Narrative Essence Generator.
-
-# Convert semantic inspiration into:
-
-# - narrative essences
-# - emotional abstractions
-# - symbolic meanings
-
-# Return JSON:
-
-# {
-#  "essences":[]
-# }
-# """
 
 
 PROMPT = """
@@ -29,7 +14,7 @@ You are a Narrative Essence Generator.
 Input:
 Semantic inspiration.
 
-Extract 10-25 concise narrative essences.
+Extract 5-7 concise narrative essences.
 
 Rules:
 

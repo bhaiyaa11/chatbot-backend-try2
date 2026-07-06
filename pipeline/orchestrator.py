@@ -34,6 +34,13 @@ RULES:
 3. Preserve factual accuracy unless asked otherwise.
 4. Do NOT explain edits.
 5. Apply tone/style/length requests naturally.
+6. NO EM DASHES in your output.
+
+OUTPUT EXACT format:
+| Time (s) | Voice Over | Visuals |
+|----------|------------|---------|
+| 0 | voiceover text here | visual description here |
+| 5 | voiceover text here | visual description here |
 """
 
 
@@ -301,79 +308,119 @@ Do NOT create a new concept.
     }
 
     # ─────────────────────────────────────────────────────────────────────
-    # STAGE 0 — RAG RETRIEVAL
+    # HUMAN REVIEW GATE
     # ─────────────────────────────────────────────────────────────────────
 
-    yield "status:Searching for internal inspirations...\n"
-
-    rag_res: StageResult = await RAGRetrievalStage().run(
-        prompt=prompt,
-        metadata=metadata
-    )
-
-    trace.append(
-        rag_res.model_dump(exclude={"data"})
-    )
-
-    retrieved_chunks = (
-        rag_res.data
-        if rag_res.success
-        else []
-    )
-    print(
-    f"\n[Orchestrator] Retrieved "
-    f"{len(retrieved_chunks)} chunks\n"
-)
-
-    logger.info(
-        f"[Orchestrator] Retrieved "
-        f"{len(retrieved_chunks)} chunks"
-    )
-
-    # ─────────────────────────────────────────────────────────────────────
-    # STAGE 0.5 — SEMANTIC DISTILLATION ENGINE
-    # ─────────────────────────────────────────────────────────────────────
-
-    yield "status:Preparing semantic inspirations...\n"
-
-    creativity_ratio = (
-        preferences.get("creativity_ratio", 0.5)
-        if preferences
-        else 0.5
+    is_human_reviewed = bool(
+        approved_essences
+        or approved_interpretations
+        or creative_summary
     )
 
     logger.info(
-        f"[Orchestrator] Creativity ratio: "
-        f"{creativity_ratio}"
+        f"[Orchestrator] Human reviewed path: {is_human_reviewed}"
     )
-    print(
-    f"\n[Orchestrator] Creativity Ratio = "
-    f"{creativity_ratio}\n"
-)
+    # ─────────────────────────────────────────────────────────────────────
+    # STAGE 0 — RAG RETRIEVAL  (skipped if human-reviewed)
+    # ─────────────────────────────────────────────────────────────────────
 
-    sie = SemanticDistillationEngine()
+    if is_human_reviewed:
 
-    sie_result = await sie.process(
-        retrieved_chunks=retrieved_chunks,
-        creativity_ratio=creativity_ratio
-    )
+        yield "status:Using approved creative direction...\n"
 
-    semantic_inspiration = sie_result.get(
-        "semantic_inspiration"
-    )
-    print("\n" + "=" * 60)
-    print("[Orchestrator] SEMANTIC INSPIRATION")
-    print(str(semantic_inspiration)[:2000])
-    print("=" * 60 + "\n")
+        retrieved_chunks = []
 
-    compressed_chunks = sie_result.get(
-        "compressed_chunks",
-        []
-    )
+        logger.info(
+            "[Orchestrator] Skipping RAG retrieval — "
+            "human-approved content present"
+        )
 
-    logger.info(
-        "[Orchestrator] Semantic inspiration prepared"
-    )
+    else:
+
+        yield "status:Searching for internal inspirations...\n"
+
+        rag_res: StageResult = await RAGRetrievalStage().run(
+            prompt=prompt,
+            metadata=metadata
+        )
+
+        trace.append(
+            rag_res.model_dump(exclude={"data"})
+        )
+
+        retrieved_chunks = (
+            rag_res.data
+            if rag_res.success
+            else []
+        )
+
+        print(
+            f"\n[Orchestrator] Retrieved "
+            f"{len(retrieved_chunks)} chunks\n"
+        )
+
+        logger.info(
+            f"[Orchestrator] Retrieved "
+            f"{len(retrieved_chunks)} chunks"
+        )
+
+    # ─────────────────────────────────────────────────────────────────────
+    # STAGE 0.5 — SEMANTIC DISTILLATION ENGINE  (skipped if human-reviewed)
+    # ─────────────────────────────────────────────────────────────────────
+
+    if is_human_reviewed:
+
+        semantic_inspiration = None
+        compressed_chunks = []
+
+        logger.info(
+            "[Orchestrator] Skipping semantic distillation — "
+            "human-approved content present"
+        )
+
+    else:
+
+        yield "status:Preparing semantic inspirations...\n"
+
+        creativity_ratio = (
+            preferences.get("creativity_ratio", 0.5)
+            if preferences
+            else 0.5
+        )
+
+        logger.info(
+            f"[Orchestrator] Creativity ratio: "
+            f"{creativity_ratio}"
+        )
+        print(
+            f"\n[Orchestrator] Creativity Ratio = "
+            f"{creativity_ratio}\n"
+        )
+
+        sie = SemanticDistillationEngine()
+
+        sie_result = await sie.process(
+            retrieved_chunks=retrieved_chunks,
+            creativity_ratio=creativity_ratio
+        )
+
+        semantic_inspiration = sie_result.get(
+            "semantic_inspiration"
+        )
+
+        print("\n" + "=" * 60)
+        print("[Orchestrator] SEMANTIC INSPIRATION")
+        print(str(semantic_inspiration)[:2000])
+        print("=" * 60 + "\n")
+
+        compressed_chunks = sie_result.get(
+            "compressed_chunks",
+            []
+        )
+
+        logger.info(
+            "[Orchestrator] Semantic inspiration prepared"
+        )
 
     # ─────────────────────────────────────────────────────────────────────
     # STAGE 1 — VOICEOVER
@@ -441,6 +488,7 @@ Do NOT create a new concept.
         file_parts=file_parts,
         metadata=metadata,
         research_brief=research_brief,
+        is_human_reviewed=is_human_reviewed,   # ← add this
     )
 
     trace.append(
@@ -483,28 +531,28 @@ Do NOT create a new concept.
     # ─────────────────────────────────────────────────────────────────────
     # RAG INGESTION
     # ─────────────────────────────────────────────────────────────────────
+# this adds new scripts to the RAG database for future retrieval
+    # rag_processor = RAGProcessor()
 
-    rag_processor = RAGProcessor()
+    # asyncio.create_task(
+    #     rag_processor.process_and_ingest({
 
-    asyncio.create_task(
-        rag_processor.process_and_ingest({
+    #         "content": str(r3.data),
 
-            "content": str(r3.data),
+    #         "client": client,
 
-            "client": client,
+    #         "business_unit": business_unit,
+    #         "styles": styles,
+    #         "industries": industries,
+    #         "serviceLines": serviceLines,
 
-            "business_unit": business_unit,
-            "styles": styles,
-            "industries": industries,
-            "serviceLines": serviceLines,
+    #         "video_type": video_type,
 
-            "video_type": video_type,
+    #         "tone": video_tone,
 
-            "tone": video_tone,
+    #         "metadata": {
+    #             "source": "pipeline_generation"
+    #         }
 
-            "metadata": {
-                "source": "pipeline_generation"
-            }
-
-        })
-    )
+    #     })
+    # )
