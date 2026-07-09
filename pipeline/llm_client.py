@@ -20,13 +20,15 @@ logger = logging.getLogger(__name__)
 # Location map — only CRITIC uses global
 # --------------------------------------------------
 _STAGE_LOCATIONS = {
-    "VOICE_OVER": "us",
-    "VISUALS":    "us",
+    # "VOICE_OVER": "us",
+    # "VISUALS":    "us",
+    "VOICE_OVER": "us-central1",
+    "VISUALS":    "us-central1",
     "CRITIC":     "global",
 }
 
 def _get_client_and_model(stage: str, endpoint: str):
-    location = _STAGE_LOCATIONS.get(stage, "us")
+    location = _STAGE_LOCATIONS.get(stage, "us-central1")
     client = get_genai_client(location=location)
     model_id = endpoint.strip()
     return client, model_id
