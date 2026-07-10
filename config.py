@@ -758,14 +758,14 @@ RULES:
 
 MODEL_ENDPOINTS = {
     "VOICE_OVER": [
-        "projects/poc-script-genai/locations/us-central1/endpoints/8801380023870160896",
-        # "projects/331298860778/locations/us/endpoints/1981724573531373568",
+        # "projects/poc-script-genai/locations/us-central1/endpoints/8801380023870160896",
+        "projects/331298860778/locations/us/endpoints/1981724573531373568",
         "gemini-2.5-flash-lite",
 
     ],
     "VISUALS": [
-        "projects/poc-script-genai/locations/us-central1/endpoints/913694712437669888",
-        # "projects/331298860778/locations/us/endpoints/612630286810742784",
+        # "projects/poc-script-genai/locations/us-central1/endpoints/913694712437669888",
+        "projects/331298860778/locations/us/endpoints/612630286810742784",
         "gemini-2.5-flash-lite",
     ],
     "CRITIC": [
@@ -801,14 +801,14 @@ CACHE_TTL_SECONDS          = 3600
 PIPELINE_TIMEOUT_SECONDS   = 600
 
 STAGE_LOCATIONS = {
-    # "VOICE_OVER": "us",
-    # "VISUALS":    "us",
-    "VOICE_OVER": "us-central1",
-    "VISUALS":    "us-central1",
+    "VOICE_OVER": "us",
+    "VISUALS":    "us",
+    # "VOICE_OVER": "us-central1",
+    # "VISUALS":    "us-central1",
     "CRITIC":     "global",
 }
 
-def get_genai_client(location: str = "us-central1"):
+def get_genai_client(location: str = "us"):
     from google import genai
     from google.oauth2 import service_account
     base64_creds = os.environ.get("GOOGLE_CREDENTIALS_BASE64")
