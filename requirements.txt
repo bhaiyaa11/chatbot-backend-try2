@@ -35,7 +35,7 @@ genkit==0.4.0
 genkit-plugin-google-genai==0.4.0
 google-api-core==2.28.1
 google-auth==2.55.2
-google-cloud-aiplatform==1.126.1
+# google-cloud-aiplatform==1.126.1
 google-cloud-bigquery==3.38.0
 google-cloud-core==2.5.0
 google-cloud-discoveryengine==0.17.0
@@ -165,7 +165,7 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.5.0
 uvicorn==0.38.0
-vertexai==1.43.0
+# vertexai==1.43.0
 wcwidth==0.2.14
 websockets==15.0.1
 Werkzeug==3.1.5
