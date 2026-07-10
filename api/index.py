@@ -11,7 +11,7 @@ from ingest.file_parser import parse_files
 from pipeline.orchestrator import run_pipeline, run_conversational_pipeline
 from supabase import create_client
 from dotenv import load_dotenv
-from pipeline.fine_tune import export_training_jsonl, trigger_fine_tune_job
+# from pipeline.fine_tune import export_training_jsonl, trigger_fine_tune_job
 from pipeline.stages.niche_research import NicheResearchStage
 from memory.log_store import get_logs
 from memory.conversation_manager import ConversationManager
