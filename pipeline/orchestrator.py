@@ -108,10 +108,12 @@ async def run_conversational_pipeline(
         full_prompt = "\n\n".join(parts)
 
         from pipeline.llm_client import generate_text
+        contents = [full_prompt] + (file_parts or [])
 
         result = await generate_text(
             "CRITIC",
-            [full_prompt]
+            # [full_prompt]
+            contents
         )
 
         if not result or not result.strip():
@@ -278,11 +280,19 @@ Maintain formatting consistency.
 Do NOT create a new concept.
 """
 
+        # from pipeline.llm_client import generate_text
+
+        # result = await generate_text(
+        #     "CRITIC",
+        #     [edit_prompt]
+        # )
         from pipeline.llm_client import generate_text
+
+        contents = [edit_prompt] + (file_parts or [])
 
         result = await generate_text(
             "CRITIC",
-            [edit_prompt]
+            contents
         )
 
         if not result.strip():

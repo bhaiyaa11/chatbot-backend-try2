@@ -99,7 +99,20 @@ VOICE_AGENTS = {
     "ASHER_BRITISH_SOCIALMEDIA":                 {"voice_id": os.getenv("ASHER_BRITISH_SOCIALMEDIA")},
     "MR_DAVID_BRIT_CONVO_MALE_OLD":                 {"voice_id": os.getenv("MR_DAVID_BRIT_CONVO_MALE_OLD")}, 
     "SAMMY_AEMRICAN_CONVO_NUETRAL_YOUNG":         {"voice_id": os.getenv("SAMMY_AEMRICAN_CONVO_NUETRAL_YOUNG")},
+    "ELLIS_BRIT_YOUNG_M_CONVO":         {"voice_id": os.getenv("ELLIS_BRIT_YOUNG_M_CONVO")},
+    "JAMES_BRIT_YOUNG_M_CONVO":         {"voice_id": os.getenv("JAMES_BRIT_YOUNG_M_CONVO")},
+    "JACK_BRIT_YOUNG_M_CONVO":         {"voice_id": os.getenv("JACK_BRIT_YOUNG_M_CONVO")},
+    "LLOYD_BRIT_YOUNG_M_SM":         {"voice_id": os.getenv("LLOYD_BRIT_YOUNG_M_SM")},
+    "JOSH_BRIT_YOUNG_M_SM":         {"voice_id": os.getenv("JOSH_BRIT_YOUNG_M_SM")},
+    "HARRY_BRIT_YOUNG_M_SM":         {"voice_id": os.getenv("HARRY_BRIT_YOUNG_M_SM")},
+    "ALFIE_BRIT_YOUNG_M_AD":         {"voice_id": os.getenv("ALFIE_BRIT_YOUNG_M_AD")},
+    "ROCK_BRIT_YOUNG_M_AD":         {"voice_id": os.getenv("ROCK_BRIT_YOUNG_M_AD")},
+    "JAMES_BRIT_YOUNG_M_AD":         {"voice_id": os.getenv("JAMES_BRIT_YOUNG_M_AD")},
+    "JAMES_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("JAMES_BRIT_MID_M_CONVO")},
+    "FINN_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("FINN_BRIT_MID_M_CONVO")},
+    "MARTIN_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("MARTIN_BRIT_MID_M_CONVO")},
 
+    
 }
 
 # ============================================================

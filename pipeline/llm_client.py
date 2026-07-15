@@ -3,6 +3,9 @@ from google import genai
 from config import MODEL_ENDPOINTS, MAX_RETRIES, get_genai_client
 from pipeline.cache import cache
 from dotenv import load_dotenv
+import base64
+
+
 
 load_dotenv()
 
@@ -15,6 +18,76 @@ anthropic_client = AsyncAnthropic(
 
 
 logger = logging.getLogger(__name__)
+
+
+# --------------------------------------------------
+# Convert Google GenAI Parts → Anthropic content blocks
+# --------------------------------------------------
+
+def _part_to_anthropic_block(part) -> dict | None:
+    """
+    Converts a google.genai.types.Part (image/video, built via
+    Part.from_bytes) into an Anthropic-compatible content block.
+    Returns None for unsupported types (e.g. video — Claude's
+    Messages API doesn't accept video input).
+    """
+    try:
+        inline = getattr(part, "inline_data", None)
+        if inline is None or inline.data is None:
+            return None
+
+        mime = (inline.mime_type or "").lower()
+        data = inline.data
+        b64 = (
+            base64.b64encode(data).decode("utf-8")
+            if isinstance(data, (bytes, bytearray))
+            else data
+        )
+
+        if mime.startswith("image/"):
+            return {
+                "type": "image",
+                "source": {"type": "base64", "media_type": mime, "data": b64},
+            }
+
+        if mime == "application/pdf":
+            return {
+                "type": "document",
+                "source": {"type": "base64", "media_type": mime, "data": b64},
+            }
+
+        logger.warning(f"[Anthropic] Unsupported media type skipped: {mime}")
+        return None
+
+    except Exception as e:
+        logger.error(f"[Anthropic] Failed to convert file part: {e}")
+        return None
+
+
+def _build_anthropic_content(contents: list) -> list:
+    """
+    Splits a mixed `contents` list (strings + types.Part objects) into
+    Anthropic content blocks. Media blocks are placed before the text
+    block, per Anthropic's recommendation for image-referencing prompts.
+    """
+    media_blocks = []
+    text_chunks = []
+
+    for item in contents:
+        if isinstance(item, str):
+            if item.strip():
+                text_chunks.append(item)
+        else:
+            block = _part_to_anthropic_block(item)
+            if block:
+                media_blocks.append(block)
+
+    blocks = list(media_blocks)
+    if text_chunks:
+        blocks.append({"type": "text", "text": "\n\n".join(text_chunks)})
+
+    return blocks
+
 
 # --------------------------------------------------
 # Location map — only CRITIC uses global
@@ -130,15 +203,32 @@ async def generate_text(stage: str, contents: list) -> str:
     """
 
     # ── Anthropic CRITIC ──────────────────────────────────────────
+    # if stage == "CRITIC":
+    #     try:
+    #         response = await anthropic_client.messages.create(
+    #             model="claude-sonnet-4-6",
+    #             max_tokens=4000,
+    #             messages=[
+    #                 {
+    #                     "role": "user",
+    #                     "content": "\n\n".join(str(x) for x in contents),
+    #                 }
+    #             ],
+    #         )
     if stage == "CRITIC":
         try:
+            content_blocks = _build_anthropic_content(contents)
+
+            if not content_blocks:
+                raise RuntimeError("No content to send to CRITIC")
+
             response = await anthropic_client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=4000,
                 messages=[
                     {
                         "role": "user",
-                        "content": "\n\n".join(str(x) for x in contents),
+                        "content": content_blocks,
                     }
                 ],
             )
@@ -202,7 +292,8 @@ async def stream_llm(stage: str, contents: list):
                     messages=[
                         {
                             "role": "user",
-                            "content": "\n\n".join(str(x) for x in contents)
+                            # "content": "\n\n".join(str(x) for x in contents)
+                            "content": _build_anthropic_content(contents)
                         }
                     ]
                 )
