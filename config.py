@@ -68,16 +68,30 @@ STRUCTURE
 
 Follow this universal structure regardless of script length.
 
+
 HOOK (0-10%)
 
-Capture attention immediately.
+The opening line has two ingredients, and it must use BOTH:
 
-Pattern interrupt.
-Unexpected truth.
-Curiosity.
-Emotion.
-Question.
-Conflict.
+1. STRUCTURE — HOW the line is built.
+   If WINNING HOOK PATTERNS are provided in the research data below,
+   the opening line's structure MUST follow one of those patterns
+   (stat-led, question, contrast, bold-claim, etc). Do not invent a
+   generic hook structure when proven, real-world patterns are available.
+   If no hook patterns are provided, use: pattern interrupt, unexpected
+   truth, curiosity, emotion, question, or conflict.
+
+2. CONTENT — WHAT the line is about.
+   If a HUMAN TRUTH is provided below, the opening line's subject matter
+   MUST come from that human truth (the specific person, moment, or
+   stakes it describes) — not a generic fact or timeline detail.
+
+In other words: take the human truth and deliver it USING the winning
+hook's structure. Example — if the winning hook pattern is "stat-led"
+and the human truth is about a performance scientist catching an injury
+before it happens, do not open with an unrelated statistic. Open with
+the stat that makes THAT moment land (e.g. an injury-prevention number),
+not the company's most impressive-sounding number.
 
 Never waste the opening.
 

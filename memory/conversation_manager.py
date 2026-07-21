@@ -178,7 +178,7 @@ class ConversationManager:
 
     async def list_conversations(
         self,
-        limit: int = 20,
+        limit: int = 2000,
         offset: int = 0,
         include_archived: bool = False,
         user_id: Optional[str] = None,  # ADDED: filter by owner

@@ -35,6 +35,10 @@ RULES:
 4. Do NOT explain edits.
 5. Apply tone/style/length requests naturally.
 6. NO EM DASHES in your output.
+7. word count rule--120 words 60 seconds with 10 words plus minus
+                   -180 words 90 seconds with 10 words plus minus
+                   -220 words 120 seconds with 10 words plus minus
+                   -260 words 150 seconds with 10 words plus minus
 
 OUTPUT EXACT format:
 | Time (s) | Voice Over | Visuals |
@@ -537,6 +541,7 @@ Do NOT create a new concept.
             final_output=str(r3.data)
         )
     )
+
 
     # ─────────────────────────────────────────────────────────────────────
     # RAG INGESTION

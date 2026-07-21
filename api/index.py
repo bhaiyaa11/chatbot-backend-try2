@@ -293,6 +293,7 @@ async def chat(
 
     async def stream():
         full_output = []
+        yield f"conversation_id:{conv_id}\n"
         try:
             file_parts = await parse_files(files or [], stage="VOICE_OVER")
             preferences = {"creativity_ratio": creativity_ratio}
@@ -336,7 +337,7 @@ async def chat(
                         user_id=user_id,
                     )
 
-            yield f"conversation_id:{conv_id}\n"
+            
 
         except Exception as e:
             logger.error(f"[{trace_id}] Unhandled stream error: {e}")
@@ -464,7 +465,8 @@ async def get_messages(
     chat_id: str = Query(None, description="Chat ID (backward compat)"),
     conversation_id: str = Query(None, description="Conversation ID"),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
-    limit: int = Query(20, ge=1, le=100, description="Messages per page"),
+    # limit: int = Query(2000, ge=1, le=2000, description="Messages per page"),
+    limit: int | None = Query(None, ge=1),
 ):
     try:
         target_id = conversation_id or chat_id
