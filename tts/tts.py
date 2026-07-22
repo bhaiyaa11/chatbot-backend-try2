@@ -111,6 +111,44 @@ VOICE_AGENTS = {
     "JAMES_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("JAMES_BRIT_MID_M_CONVO")},
     "FINN_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("FINN_BRIT_MID_M_CONVO")},
     "MARTIN_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("MARTIN_BRIT_MID_M_CONVO")},
+    "DANIEL_BRIT_MID_M_SM": {"voice_id": os.getenv("DANIEL_BRIT_MID_M_SM")},
+    "MYSTERIOUS_BRIT_MID_M_SM": {"voice_id": os.getenv("MYSTERIOUS_BRIT_MID_M_SM")},
+    "EDMUND_BRIT_MID_M_SM": {"voice_id": os.getenv("EDMUND_BRIT_MID_M_SM")},
+    "RUSS_BRIT_MID_AD":{"voice_id": os.getenv("RUSS_BRIT_MID_AD")},
+    "CONOR_BRIT_MID_AD":{"voice_id": os.getenv("CONOR_BRIT_MID_AD")},
+    "CHRIS_BRIT_MID_AD":{"voice_id": os.getenv("CHRIS_BRIT_MID_AD")},
+    "grandpa_brit_ad":{"voice_id": os.getenv("grandpa_brit_ad")},
+    "JOE_brit_old_sm":{"voice_id": os.getenv("JOE_brit_old_sm")},
+    "DAN_brit_old_sm":{"voice_id": os.getenv("DAN_brit_old_sm")},
+    "sam_brit_ad":{"voice_id": os.getenv("sam_brit_ad")},
+    "KATRINA_BRIT_YOUNG_F_CONVO":         {"voice_id": os.getenv("KATRINA_BRIT_YOUNG_F_CONVO")},
+    "ABIGAIL_BRIT_YOUNG_F_CONVO":         {"voice_id": os.getenv("ABIGAIL_BRIT_YOUNG_F_CONVO")},
+    "Charlotte_BRIT_YOUNG_F_CONVO":{"voice_id":os.getenv("Charlotte_BRIT_YOUNG_F_CONVO")},
+    "PEACH_BRIT_YOUNG_F_SM":{"voice_id":os.getenv("PEACH_BRIT_YOUNG_F_SM")},
+    "KRISTY_BRIT_YOUNG_F_SM":{"voice_id":os.getenv("KRISTY_BRIT_YOUNG_F_SM")},
+    "EFFY_BRIT_YOUNG_F_AD":{"voice_id":os.getenv("EFFY_BRIT_YOUNG_F_AD")},
+    "PEPPER_BRIT_YOUNG_F_AD":{"voice_id":os.getenv("PEPPER_BRIT_YOUNG_F_AD")},
+    "SERENA_BRIT_YOUNG_F_AD":{"voice_id":os.getenv("SERENA_BRIT_YOUNG_F_AD")},
+    "PIA_BRIT_MID_F_CONVO":{"voice_id":os.getenv("PIA_BRIT_MID_F_CONVO")},
+    "VALORY_BRIT_MID_F_CONVO":{"voice_id":os.getenv("VALORY_BRIT_MID_F_CONVO")},
+    "KATIE_BRIT_MID_F_CONVO":{"voice_id":os.getenv("KATIE_BRIT_MID_F_CONVO")},
+    "AIR_BRIT_MID_F_SM":{"voice_id":os.getenv("AIR_BRIT_MID_F_SM")},
+    "SAMARA_BRIT_MID_F_SM":{"voice_id":os.getenv("SAMARA_BRIT_MID_F_SM")},
+    "IMOGEN_BRIT_MID_F_SM":{"voice_id":os.getenv("IMOGEN_BRIT_MID_F_SM")},
+    "VELVET_BRIT_MID_F_AD":{"voice_id":os.getenv("VELVET_BRIT_MID_F_AD")},
+    "EMILY_BRIT_MID_F_AD":{"voice_id":os.getenv("EMILY_BRIT_MID_F_AD")},
+    "BEATRICE_BRIT_OLD_CONVO":{"voice_id":os.getenv("BEATRICE_BRIT_OLD_CONVO")},
+    "JANE_BRIT_OLD_SM":{"voice_id":os.getenv("JANE_BRIT_OLD_SM")},
+    "ELEANOR_BRIT_OLD_AD":{"voice_id":os.getenv("ELEANOR_BRIT_OLD_AD")},
+    "EVELYN_BRIT_YOUNG_N_CONVO":{"voice_id":os.getenv("EVELYN_BRIT_YOUNG_N_CONVO")},
+    "MARSHAL_BRIT_MID_N_CONVO":{"voice_id":os.getenv("MARSHAL_BRIT_MID_N_CONVO")},
+    "DARCY_BRIT_MID_N_SM":{"voice_id":os.getenv("DARCY_BRIT_MID_N_SM")},
+    
+
+
+    
+    
+
 
     
 }
