@@ -78,7 +78,7 @@ async def run_conversational_pipeline(
 
     if context.has_prior_context and context.last_script:
 
-        yield "status:Processing your request...\n"
+        yield "status:thinking...\n"
 
         parts = [CONVERSATIONAL_EDIT_SYSTEM_PROMPT]
 
