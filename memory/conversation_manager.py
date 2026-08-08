@@ -100,7 +100,7 @@ class ConversationManager:
         If conversation_id is empty/None, creates a new conversation.
         """
         if conversation_id:
-            existing = await self.get_conversation(conversation_id)
+            existing = await self.get_conversation(conversation_id,user_id)
             if existing:
                 return existing
 
@@ -110,22 +110,51 @@ class ConversationManager:
             user_id=user_id,
         )
 
-    async def get_conversation(self, conversation_id: str) -> Optional["Conversation"]:
-        """Fetch a conversation by ID. Returns None if not found."""
+    # async def get_conversation(self, conversation_id: str) -> Optional["Conversation"]:
+    #     """Fetch a conversation by ID. Returns None if not found."""
+    #     try:
+    #         res = (
+    #             self._client.table("conversations")
+    #             .select("*")
+    #             .eq("id", conversation_id)
+    #             .limit(1)
+    #             .execute()
+    #         )
+    #         if res.data:
+    #             return self._to_conversation(res.data[0])
+    #         return None
+    #     except Exception as e:
+    #         logger.error(f"[ConversationManager] Failed to get conversation {conversation_id}: {e}")
+    #         return None
+
+    async def get_conversation(
+        self,
+        conversation_id: str,
+        user_id: str,
+    ) -> Optional["Conversation"]:
+        """Fetch a conversation only if it belongs to the authenticated user."""
         try:
             res = (
                 self._client.table("conversations")
                 .select("*")
                 .eq("id", conversation_id)
+                .eq("user_id", user_id)
                 .limit(1)
                 .execute()
             )
+
             if res.data:
                 return self._to_conversation(res.data[0])
+
             return None
+
         except Exception as e:
-            logger.error(f"[ConversationManager] Failed to get conversation {conversation_id}: {e}")
+            logger.error(
+                f"[ConversationManager] Failed to get conversation "
+                f"{conversation_id}: {e}"
+            )
             return None
+            
 
     async def _create_conversation(
         self,
@@ -208,16 +237,47 @@ class ConversationManager:
             logger.error(f"[ConversationManager] Failed to list conversations: {e}")
             return []
 
-    async def archive_conversation(self, conversation_id: str) -> bool:
-        """Soft-delete a conversation by setting is_archived=True."""
+    # async def archive_conversation(self, conversation_id: str) -> bool:
+    #     """Soft-delete a conversation by setting is_archived=True."""
+    #     try:
+    #         self._client.table("conversations").update(
+    #             {"is_archived": True}
+    #         ).eq("id", conversation_id).execute()
+    #         logger.info(f"[ConversationManager] Archived conversation {conversation_id}")
+    #         return True
+    #     except Exception as e:
+    #         logger.error(f"[ConversationManager] Failed to archive: {e}")
+    #         return False
+    async def archive_conversation(
+        self,
+        conversation_id: str,
+        user_id: str,
+    ) -> bool:
+        """Archive a conversation only if it belongs to the authenticated user."""
         try:
-            self._client.table("conversations").update(
-                {"is_archived": True}
-            ).eq("id", conversation_id).execute()
-            logger.info(f"[ConversationManager] Archived conversation {conversation_id}")
+            res = (
+                self._client
+                .table("conversations")
+                .update({"is_archived": True})
+                .eq("id", conversation_id)
+                .eq("user_id", user_id)
+                .execute()
+            )
+
+            if not res.data:
+                return False
+
+            logger.info(
+                f"[ConversationManager] Archived conversation {conversation_id}"
+            )
+
             return True
+
         except Exception as e:
-            logger.error(f"[ConversationManager] Failed to archive: {e}")
+            logger.error(
+                f"[ConversationManager] Failed to archive "
+                f"{conversation_id}: {e}"
+            )
             return False
 
     # ------------------------------------------------------------------

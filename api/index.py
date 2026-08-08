@@ -2,10 +2,10 @@ from anthropic import AsyncAnthropic
 import os
 import uuid, json, logging, asyncio
 from typing import List, Optional
-from fastapi import FastAPI, UploadFile, File, Form, APIRouter, Query, Depends, HTTPException, Security
+from fastapi import FastAPI, UploadFile, File, Form, APIRouter, Query, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+# from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from config import STAGE_LOCATIONS
 from ingest.file_parser import parse_files
 from pipeline.orchestrator import run_pipeline, run_conversational_pipeline
@@ -22,6 +22,8 @@ from pydantic import BaseModel
 from pipeline.creative_review_pipeline import run_creative_review
 from pipeline.creative_review_pipeline import run_generate_script_pipeline
 from tts.tts import generate_cinematic_voiceover, stream_audio_chunks
+from api.auth import get_current_user
+from canvas.canvas_routes import router as canvas_router, public_router as public_canvas_router
 import traceback
 from tts.tts import (
     generate_narration_script,
@@ -56,23 +58,28 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-supabase_client = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_SERVICE_ROLE_KEY"),
+# supabase_client = create_client(
+#     os.getenv("SUPABASE_URL"),
+#     os.getenv("SUPABASE_SERVICE_ROLE_KEY"),
     
-)
-from supabase import create_client as create_auth_client
-supabase_auth_client = create_auth_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_SERVICE_ROLE_KEY"),  # must be the service_role key, not anon
-)
+# )
+# from supabase import create_client as create_auth_client
+# supabase_auth_client = create_auth_client(
+#     os.getenv("SUPABASE_URL"),
+#     os.getenv("SUPABASE_SERVICE_ROLE_KEY"),  # must be the service_role key, not anon
+# )
+
+
+from db.client import supabase
+
+supabase_client = supabase
 
 # ---------------------------------------------------------------------------
 # Memory layer initialization
 # ---------------------------------------------------------------------------
-conversation_manager = ConversationManager(supabase_client)
-summarizer           = ConversationSummarizer(supabase_client)
-vector_memory        = VectorMemory(supabase_client)
+conversation_manager = ConversationManager(supabase)
+summarizer           = ConversationSummarizer(supabase)
+vector_memory        = VectorMemory(supabase)
 context_assembler    = ContextAssembler(
     conversation_manager=conversation_manager,
     summarizer=summarizer,
@@ -85,23 +92,23 @@ anthropic_client = AsyncAnthropic(
 
 
 
-bearer_scheme = HTTPBearer(auto_error=False)
+# bearer_scheme = HTTPBearer(auto_error=False)
 
 
 
-# Then get_current_user uses supabase_client directly:
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
-) -> str:
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
-    try:
-        response = supabase_client.auth.get_user(credentials.credentials)
-        if not response or not response.user:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return response.user.id
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Auth error: {e}")
+# # Then get_current_user uses supabase_client directly:
+# async def get_current_user(
+#     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
+# ) -> str:
+#     if not credentials:
+#         raise HTTPException(status_code=401, detail="Missing Authorization header")
+#     try:
+#         response = supabase_client.auth.get_user(credentials.credentials)
+#         if not response or not response.user:
+#             raise HTTPException(status_code=401, detail="Invalid token")
+#         return response.user.id
+#     except Exception as e:
+#         raise HTTPException(status_code=401, detail=f"Auth error: {e}")
 
 # ---------------------------------------------------------------------------
 # FastAPI app
@@ -136,6 +143,10 @@ async def startup():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# Canvas API
+app.include_router(canvas_router)
+app.include_router(public_canvas_router)
 
 
 # ---------------------------------------------------------------------------
@@ -288,6 +299,7 @@ async def chat(
         
     context = await context_assembler.assemble(
         conversation_id=conv_id,
+        user_id=user_id,
         current_prompt=prompt,
     )
 
@@ -541,13 +553,23 @@ async def get_conversation(
     conv_id: str,
     user_id: str = Depends(get_current_user),
 ):
-    conv = await conversation_manager.get_conversation(conv_id)
-    if not conv:
-        return JSONResponse({"error": "Conversation not found"}, status_code=404)
+    # conv = await conversation_manager.get_conversation(conv_id)
+    # if not conv:
+    #     return JSONResponse({"error": "Conversation not found"}, status_code=404)
 
-    # Ownership check — prevent users from reading each other's conversations
-    if hasattr(conv, "user_id") and conv.user_id and conv.user_id != user_id:
-        return JSONResponse({"error": "Forbidden"}, status_code=403)
+    # # Ownership check — prevent users from reading each other's conversations
+    # if hasattr(conv, "user_id") and conv.user_id and conv.user_id != user_id:
+    #     return JSONResponse({"error": "Forbidden"}, status_code=403)
+    conv = await conversation_manager.get_conversation(
+        conv_id,
+        user_id,
+    )
+
+    if not conv:
+        return JSONResponse(
+            {"error": "Conversation not found"},
+            status_code=404,
+        )
 
     summary_data = await summarizer.get_latest_summary(conv_id)
 
@@ -568,9 +590,13 @@ async def archive_conversation(
     user_id: str = Depends(get_current_user),
 ):
     # Ownership check before archiving
-    conv = await conversation_manager.get_conversation(conv_id)
-    if conv and hasattr(conv, "user_id") and conv.user_id and conv.user_id != user_id:
-        return JSONResponse({"error": "Forbidden"}, status_code=403)
+    # conv = await conversation_manager.get_conversation(conv_id)
+    # if conv and hasattr(conv, "user_id") and conv.user_id and conv.user_id != user_id:
+    #     return JSONResponse({"error": "Forbidden"}, status_code=403)
+    success = await conversation_manager.archive_conversation(
+    conv_id,
+    user_id,
+)
 
     success = await conversation_manager.archive_conversation(conv_id)
     if success:
@@ -816,5 +842,66 @@ async def transcribe(audio: UploadFile = File(...)):
         logger.error(f"[/transcribe] Error: {e}")
         traceback.print_exc()
         return JSONResponse({"text": "", "error": str(e)}, status_code=500)
+
+
+from pipeline.stages.visuals_generator import (
+    run_storyboard_job, get_job, VIDEO_TYPE_LABELS,
+)
+
+VIDEO_OUTPUT_DIR = "generated_videos"
+os.makedirs(VIDEO_OUTPUT_DIR, exist_ok=True)
+
+
+class StoryboardRequest(BaseModel):
+    script:     str
+    video_type: str            # "3d_animation" | "2d_animation" | "talking_head" | "live_action_motion"
+    quality:    str = "fast"   # "fast" | "quality"
+
+
+@app.post("/generate-storyboard")
+async def start_storyboard(data: StoryboardRequest, background_tasks: BackgroundTasks):
+    if data.video_type not in VIDEO_TYPE_LABELS:
+        return JSONResponse({"error": f"Invalid video_type. Must be one of: {list(VIDEO_TYPE_LABELS)}"}, status_code=400)
+    if not data.script.strip():
+        return JSONResponse({"error": "No script provided"}, status_code=400)
+
+    job_id = str(uuid.uuid4())[:12]
+    background_tasks.add_task(
+        run_storyboard_job, job_id, data.script, data.video_type, data.quality, VIDEO_OUTPUT_DIR
+    )
+    return {"job_id": job_id, "status": "pending"}
+
+
+
+@app.get("/generate-storyboard/{job_id}")
+async def get_storyboard_status(job_id: str):
+    job = get_job(job_id)
+    if job is None:
+        return JSONResponse({"error": "Job not found"}, status_code=404)
+
+    return {
+        "job_id": job.job_id,
+        "status": job.status,          # pending | running | concatenating | done | error
+        "total_scenes": job.total_scenes,
+        "completed_count": len(job.completed),
+        "error": job.error,
+        "clips": [
+            {"url": f"/videos/{c['filename']}", "scene_number": c["scene_number"], "caption": c["caption"]}
+            for c in job.completed
+        ],
+        "final_video": (
+            {"url": f"/videos/{job.final_video['filename']}"}
+            if job.final_video else None
+        ),
+    }
+
+
+@app.get("/videos/{filename}")
+async def get_storyboard_video(filename: str):
+    path = os.path.join(VIDEO_OUTPUT_DIR, filename)
+    if not os.path.exists(path):
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return FileResponse(path, media_type="video/mp4")
+
 
 # uvicorn api.index:app --reload

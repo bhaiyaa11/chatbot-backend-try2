@@ -822,6 +822,24 @@ STAGE_LOCATIONS = {
     "CRITIC":     "global",
 }
 
+def get_gcp_credentials():
+    """Returns the same service_account.Credentials used by get_genai_client,
+    for use by other GCP clients (e.g. google-cloud-storage) that need
+    explicit credentials instead of falling back to ADC."""
+    from google.oauth2 import service_account
+    base64_creds = os.environ.get("GOOGLE_CREDENTIALS_BASE64")
+
+    if base64_creds:
+        decoded = base64.b64decode(base64_creds).decode("utf-8")
+        info = json.loads(decoded)
+        return service_account.Credentials.from_service_account_info(
+            info,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+
+    return None  # fall back to ADC
+
+
 def get_genai_client(location: str = "us"):
     from google import genai
     from google.oauth2 import service_account

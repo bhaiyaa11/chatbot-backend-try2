@@ -104,6 +104,7 @@ class ContextAssembler:
     async def assemble(
         self,
         conversation_id: str,
+        user_id: str,
         current_prompt: str,
         include_vector_memory: bool = True,
     ) -> AssembledContext:
@@ -123,7 +124,7 @@ class ContextAssembler:
         ctx = AssembledContext(conversation_id=conversation_id)
 
         # -- Step 1: Conversation metadata ---------------------------------
-        conv = await self._conv_mgr.get_conversation(conversation_id)
+        conv = await self._conv_mgr.get_conversation(conversation_id, user_id)
         if conv:
             ctx.conversation_title = conv.title
             ctx.conversation_metadata = conv.metadata

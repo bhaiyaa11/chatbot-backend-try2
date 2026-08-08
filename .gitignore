@@ -19,3 +19,5 @@ service-account.json
 generated_audio/*
 generated_audio/*.wav
 generated_audio/*.mp3
+generated_video/*
+generated_video/*.mp4
