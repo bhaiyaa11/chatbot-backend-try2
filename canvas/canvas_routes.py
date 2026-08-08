@@ -36,7 +36,7 @@ def canvas_health():
 canvas_manager = CanvasManager()
 
 # FRONTEND_ORIGIN = "http://localhost:5173"
-FRONTEND_ORIGIN = "https://chatbot-[a-zA-Z0-9\-]+\.vercel\.app"
+FRONTEND_ORIGIN = "https://chatbot-aim.vercel.app/"
 
 
 # ================================================================
