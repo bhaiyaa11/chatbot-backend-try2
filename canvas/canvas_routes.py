@@ -1,3 +1,4 @@
+
 """
 Canvas API routes.
 
@@ -14,14 +15,16 @@ CanvasManager authorization
 Supabase
 """
 
+import os
 from typing import Any, Dict, Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from api.auth import get_current_user
 from canvas.canvas_manager import CanvasManager
-from fastapi import Query
 
 
 router = APIRouter(
@@ -37,6 +40,21 @@ canvas_manager = CanvasManager()
 
 # FRONTEND_ORIGIN = "http://localhost:5173"
 FRONTEND_ORIGIN = "https://chatbot-aim.vercel.app/"
+
+# Rate limiting for the *unauthenticated* public-link endpoints below.
+# These have no JWT, so there's no per-user identity to hold
+# accountable — IP-based limiting is the baseline defense against
+# token-guessing, comment spam, and scraping. Authenticated endpoints
+# above this line are already accountable per-user via the JWT, so
+# they're not limited here (add limits there too if you want defense
+# in depth against a compromised/malicious authenticated account).
+#
+# Wire this into main.py:
+#   from canvas.canvas_routes import limiter
+#   app.state.limiter = limiter
+#   app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+#   app.add_middleware(SlowAPIMiddleware)
+limiter = Limiter(key_func=get_remote_address)
 
 
 # ================================================================
@@ -119,31 +137,14 @@ def create_canvas(
         raise HTTPException(status_code=500, detail="Failed to create canvas")
 
 
-# @router.get("")
-# def list_canvases(user_id: str = Depends(get_current_user)):
-#     try:
-#         canvases = canvas_manager.list_canvases(user_id=user_id)
-#         return {"canvases": canvases}
-#     except Exception:
-#         raise HTTPException(status_code=500, detail="Failed to load canvases")
-
 @router.get("")
-def list_canvases(
-    limit: int = Query(20, ge=1, le=50),
-    offset: int = Query(0, ge=0),
-    user_id: str = Depends(get_current_user),
-):
+def list_canvases(user_id: str = Depends(get_current_user)):
     try:
-        return canvas_manager.list_canvases(
-            user_id=user_id,
-            limit=limit,
-            offset=offset,
-        )
+        canvases = canvas_manager.list_canvases(user_id=user_id)
+        return {"canvases": canvases}
     except Exception:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to load canvases",
-        )
+        raise HTTPException(status_code=500, detail="Failed to load canvases")
+
 
 @router.get("/{canvas_id}")
 def get_canvas(canvas_id: str, user_id: str = Depends(get_current_user)):
@@ -457,9 +458,12 @@ def invite_member(
         raise HTTPException(status_code=403, detail="Only the canvas owner can invite people")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to invite member")
-
+    # except Exception:
+    #     raise HTTPException(status_code=500, detail="Failed to invite member")
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.patch("/{canvas_id}/members/{member_id}")
 def update_member(
@@ -571,13 +575,22 @@ def delete_comment(canvas_id: str, comment_id: str, user_id: str = Depends(get_c
 # Public (unauthenticated, token-based) routes
 # ================================================================
 
+class CreateGuestCommentRequest(BaseModel):
+    guest_name: str = Field(default="Guest", max_length=80)
+    content: str = Field(min_length=1, max_length=4000)
+    anchor_from: int
+    anchor_to: int
+    anchor_text: Optional[str] = None
+
+
 public_router = APIRouter(
     prefix="/shared/canvas",
     tags=["Public Canvas"],
 )
 
 @public_router.get("/{token}")
-def get_public_canvas(token: str):
+@limiter.limit("60/minute")
+def get_public_canvas(request: Request, token: str):
     try:
         canvas = canvas_manager.get_public_canvas(token)
         if not canvas:
@@ -589,9 +602,10 @@ def get_public_canvas(token: str):
         raise HTTPException(status_code=500, detail="Failed to load canvas")
 
 @public_router.patch("/{token}/content")
-def update_public_canvas_content(token: str, request: UpdateCanvasContentRequest):
+@limiter.limit("60/minute")
+def update_public_canvas_content(request: Request, token: str, request_body: UpdateCanvasContentRequest):
     try:
-        canvas = canvas_manager.update_public_canvas_content(token=token, content=request.content)
+        canvas = canvas_manager.update_public_canvas_content(token=token, content=request_body.content)
         if not canvas:
             raise HTTPException(status_code=404, detail="Canvas not found")
         return {"canvas": canvas}
@@ -601,3 +615,38 @@ def update_public_canvas_content(token: str, request: UpdateCanvasContentRequest
         raise
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to update canvas")
+
+
+@public_router.get("/{token}/comments")
+@limiter.limit("60/minute")
+def list_public_comments(request: Request, token: str):
+    try:
+        comments = canvas_manager.list_public_comments(token)
+        return {"comments": comments}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to load comments")
+
+
+@public_router.post("/{token}/comments")
+@limiter.limit("10/minute")
+def create_public_comment(request: Request, token: str, request_body: CreateGuestCommentRequest):
+    try:
+        comment = canvas_manager.create_guest_comment(
+            token=token,
+            guest_name=request_body.guest_name,
+            content=request_body.content,
+            anchor_from=request_body.anchor_from,
+            anchor_to=request_body.anchor_to,
+            anchor_text=request_body.anchor_text,
+        )
+        if not comment:
+            raise HTTPException(status_code=404, detail="Canvas not found")
+        return {"comment": comment}
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="This link does not allow comments")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to create comment")
