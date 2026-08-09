@@ -1,3 +1,4 @@
+
 # """
 # Canvas database and authorization layer.
 
@@ -277,67 +278,9 @@
 #     # List user's accessible canvases
 #     # ============================================================
 
-#     # def list_canvases(self, user_id: str) -> list:
-#     #     if not self._valid_uuid(user_id):
-#     #         raise ValueError("Invalid user ID")
-
-#     #     owned = (
-#     #         supabase
-#     #         .table("canvases")
-#     #         .select(CANVAS_SELECT_FIELDS)
-#     #         .eq("owner_id", user_id)
-#     #         .order("updated_at", desc=True)
-#     #         .execute()
-#     #     )
-
-#     #     memberships = (
-#     #         supabase
-#     #         .table("canvas_members")
-#     #         .select("canvas_id, permission")
-#     #         .eq("user_id", user_id)
-#     #         .eq("status", "accepted")
-#     #         .execute()
-#     #     )
-
-#     #     member_canvas_ids = [row["canvas_id"] for row in (memberships.data or [])]
-
-#     #     shared = []
-#     #     if member_canvas_ids:
-#     #         shared_result = (
-#     #             supabase
-#     #             .table("canvases")
-#     #             .select(CANVAS_SELECT_FIELDS)
-#     #             .in_("id", member_canvas_ids)
-#     #             .order("updated_at", desc=True)
-#     #             .execute()
-#     #         )
-#     #         shared = shared_result.data or []
-
-#     #     combined = {}
-#     #     for canvas in owned.data or []:
-#     #         combined[canvas["id"]] = canvas
-#     #     for canvas in shared:
-#     #         combined[canvas["id"]] = canvas
-
-#     #     return sorted(
-#     #         combined.values(),
-#     #         key=lambda x: x["updated_at"],
-#     #         reverse=True,
-#     #     )
-
-
-#     def list_canvases(
-#         self,
-#         user_id: str,
-#         limit: int = 20,
-#         offset: int = 0,
-#     ) -> Dict[str, Any]:
+#     def list_canvases(self, user_id: str) -> list:
 #         if not self._valid_uuid(user_id):
 #             raise ValueError("Invalid user ID")
-
-#         # Defensive pagination limits
-#         limit = max(1, min(limit, 50))
-#         offset = max(0, offset)
 
 #         owned = (
 #             supabase
@@ -357,13 +300,9 @@
 #             .execute()
 #         )
 
-#         member_canvas_ids = [
-#             row["canvas_id"]
-#             for row in (memberships.data or [])
-#         ]
+#         member_canvas_ids = [row["canvas_id"] for row in (memberships.data or [])]
 
 #         shared = []
-
 #         if member_canvas_ids:
 #             shared_result = (
 #                 supabase
@@ -373,35 +312,19 @@
 #                 .order("updated_at", desc=True)
 #                 .execute()
 #             )
-
 #             shared = shared_result.data or []
 
-#         # Combine owned + shared canvases and remove duplicates.
 #         combined = {}
-
 #         for canvas in owned.data or []:
 #             combined[canvas["id"]] = canvas
-
 #         for canvas in shared:
 #             combined[canvas["id"]] = canvas
 
-#         # Global ordering must happen BEFORE pagination.
-#         all_canvases = sorted(
+#         return sorted(
 #             combined.values(),
 #             key=lambda x: x["updated_at"],
 #             reverse=True,
 #         )
-
-#         total = len(all_canvases)
-
-#         paginated = all_canvases[offset:offset + limit]
-
-#         has_more = offset + limit < total
-
-#         return {
-#             "canvases": paginated,
-#             "has_more": has_more,
-#         }
 
 #     # ============================================================
 #     # Update content / title
@@ -846,6 +769,115 @@
 #         }
 
 #     # ============================================================
+#     # Guest comments (public link, no account required)
+#     # ============================================================
+
+#     def list_public_comments(self, token: str) -> List[Dict[str, Any]]:
+#         if not token or len(token) > 512:
+#             return []
+
+#         token_hash = self._hash_share_token(token.strip())
+
+#         canvas_result = (
+#             supabase
+#             .table("canvases")
+#             .select("id")
+#             .eq("share_token_hash", token_hash)
+#             .eq("link_access_enabled", True)
+#             .limit(1)
+#             .execute()
+#         )
+
+#         if not canvas_result.data:
+#             return []
+
+#         canvas_id = canvas_result.data[0]["id"]
+
+#         result = (
+#             supabase
+#             .table("canvas_comments")
+#             .select(
+#                 "id, canvas_id, author_id, guest_name, content, anchor_from, "
+#                 "anchor_to, anchor_text, resolved, created_at"
+#             )
+#             .eq("canvas_id", canvas_id)
+#             .order("created_at", desc=False)
+#             .execute()
+#         )
+
+#         return result.data or []
+
+#     @staticmethod
+#     def _validate_anchor(anchor_from: int, anchor_to: int) -> None:
+#         if (
+#             not isinstance(anchor_from, int)
+#             or not isinstance(anchor_to, int)
+#             or anchor_from < 0
+#             or anchor_to <= anchor_from
+#             or anchor_to - anchor_from > 20000  # sanity bound, not a real doc size limit
+#         ):
+#             raise ValueError("Invalid comment anchor")
+
+#     def create_guest_comment(
+#         self,
+#         token: str,
+#         guest_name: str,
+#         content: str,
+#         anchor_from: int,
+#         anchor_to: int,
+#         anchor_text: Optional[str] = None,
+#     ) -> Optional[Dict[str, Any]]:
+#         if not token or len(token) > 512:
+#             return None
+
+#         token_hash = self._hash_share_token(token.strip())
+
+#         canvas_result = (
+#             supabase
+#             .table("canvases")
+#             .select("id, link_permission")
+#             .eq("share_token_hash", token_hash)
+#             .eq("link_access_enabled", True)
+#             .limit(1)
+#             .execute()
+#         )
+
+#         if not canvas_result.data:
+#             return None
+
+#         canvas = canvas_result.data[0]
+
+#         if canvas.get("link_permission") not in {"commenter", "editor"}:
+#             raise PermissionError("This link does not allow comments")
+
+#         guest_name = (guest_name or "Guest").strip()[:80] or "Guest"
+#         content = (content or "").strip()
+
+#         if not content:
+#             raise ValueError("Comment cannot be empty")
+#         if len(content) > 4000:
+#             raise ValueError("Comment is too long")
+
+#         self._validate_anchor(anchor_from, anchor_to)
+
+#         row = {
+#             "canvas_id": canvas["id"],
+#             "author_id": None,
+#             "guest_name": guest_name,
+#             "content": content,
+#             "anchor_from": anchor_from,
+#             "anchor_to": anchor_to,
+#             "anchor_text": (anchor_text or "")[:300],
+#         }
+
+#         result = supabase.table("canvas_comments").insert(row).execute()
+
+#         if not result.data:
+#             raise RuntimeError("Failed to create comment")
+
+#         return result.data[0]
+
+#     # ============================================================
 #     # Restricted access: requests
 #     # ============================================================
 
@@ -1036,6 +1068,7 @@
 #     # Restricted access: members (direct invite + management)
 #     # ============================================================
 
+
 #     def invite_member(
 #         self,
 #         canvas_id: str,
@@ -1044,90 +1077,141 @@
 #         permission: str,
 #     ) -> Dict[str, Any]:
 #         """
-#         Owner directly grants access to a known person by email.
-#         Auto-accepted — no approval step needed since the owner
-#         initiated it.
+#         Create a pending canvas invitation for an email address.
 
-#         Assumes a `profiles` table mirroring auth.users (id, email).
-#         Adjust the table/column names here if your schema differs.
+#         The invited person does NOT need to have an account yet.
+
+#         The invitation remains pending until the recipient authenticates
+#         with the invited email address and accepts the invitation.
 #         """
 
 #         self.require_owner(canvas_id, owner_id)
 
 #         allowed_permissions = {"viewer", "commenter", "editor"}
+
 #         if permission not in allowed_permissions:
 #             raise ValueError("Invalid permission")
 
 #         email = (email or "").strip().lower()
+
 #         if not email:
 #             raise ValueError("Email is required")
 
-#         profile = (
+#         # Basic email validation.
+#         if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+#             raise ValueError("Please enter a valid email address")
+
+#         # Owner cannot invite themselves.
+#         owner_profile = (
 #             supabase
 #             .table("profiles")
-#             .select("id, email")
-#             .eq("email", email)
+#             .select("email")
+#             .eq("id", owner_id)
 #             .maybe_single()
 #             .execute()
 #         )
 
-#         if not profile.data:
-#             raise ValueError("No user found with that email")
-
-#         invited_user_id = profile.data["id"]
-
-#         if invited_user_id == owner_id:
+#         if (
+#             owner_profile.data
+#             and owner_profile.data.get("email")
+#             and owner_profile.data["email"].strip().lower() == email
+#         ):
 #             raise ValueError("You already own this canvas")
+
+#         # ------------------------------------------------------------
+#         # Generate a random invitation token.
+#         #
+#         # Raw token:
+#         #   sent to the client in the invitation URL
+#         #
+#         # Hash:
+#         #   stored in the database
+#         #
+#         # We NEVER store the raw invitation token.
+#         # ------------------------------------------------------------
+
+#         raw_token = secrets.token_urlsafe(32)
+#         token_hash = self._hash_share_token(raw_token)
+
+#         # ------------------------------------------------------------
+#         # Check whether this email already has an invitation
+#         # for this canvas.
+#         # ------------------------------------------------------------
+
+
 
 #         existing = (
 #             supabase
-#             .table("canvas_members")
-#             .select("id")
+#             .table("canvas_invitations")
+#             .select("id, status")
 #             .eq("canvas_id", canvas_id)
-#             .eq("user_id", invited_user_id)
-#             .maybe_single()
+#             .eq("email", email)
+#             .limit(1)
 #             .execute()
 #         )
 
-#         if existing.data:
+#         existing_row = existing.data[0] if existing and existing.data else None
+
+#         if existing_row:
+#             # Re-inviting the same email updates the existing invitation.
 #             updated = (
 #                 supabase
-#                 .table("canvas_members")
+#                 .table("canvas_invitations")
 #                 .update({
 #                     "permission": permission,
-#                     "status": "accepted",
+#                     "status": "pending",
+#                     "invited_by": owner_id,
+#                     "token_hash": token_hash,
+#                     "accepted_at": None,
 #                 })
-#                 .eq("id", existing.data["id"])
+#                 .eq("id", existing_row["id"])
 #                 .execute()
 #             )
-#             row = updated.data[0]
+
+#             if not updated.data:
+#                 raise RuntimeError("Failed to update canvas invitation")
+
+#             invitation = updated.data[0]
+
 #         else:
-#             inserted = (
+#             # New invitation.
+#             created = (
 #                 supabase
-#                 .table("canvas_members")
+#                 .table("canvas_invitations")
 #                 .insert({
 #                     "canvas_id": canvas_id,
-#                     "user_id": invited_user_id,
+#                     "email": email,
 #                     "permission": permission,
-#                     "status": "accepted",
+#                     "status": "pending",
+#                     "invited_by": owner_id,
+#                     "token_hash": token_hash,
 #                 })
 #                 .execute()
 #             )
-#             row = inserted.data[0]
 
-#         self._notify(
-#             user_id=invited_user_id,
-#             canvas_id=canvas_id,
-#             type_="added_to_canvas",
-#             payload={},
-#         )
+#             if not created.data:
+#                 raise RuntimeError("Failed to create canvas invitation")
+
+#             invitation = created.data[0]
+
+       
+
+#         # ------------------------------------------------------------
+#         # IMPORTANT:
+#         #
+#         # We do NOT create canvas_members here.
+#         #
+#         # canvas_members will be created only after the client
+#         # authenticates and the email matches this invitation.
+#         # ------------------------------------------------------------
 
 #         return {
-#             "id": row["id"],
-#             "user_id": invited_user_id,
+#             "id": invitation["id"],
+#             "canvas_id": canvas_id,
 #             "email": email,
-#             "permission": row["permission"],
-#             "status": row["status"],
+#             "permission": invitation["permission"],
+#             "status": invitation["status"],
+#             "token": raw_token,
 #         }
 
 #     def list_members(self, canvas_id: str, owner_id: str) -> List[Dict[str, Any]]:
@@ -1199,7 +1283,7 @@
 #             supabase
 #             .table("canvas_comments")
 #             .select(
-#                 "id, canvas_id, author_id, content, anchor_from, "
+#                 "id, canvas_id, author_id, guest_name, content, anchor_from, "
 #                 "anchor_to, anchor_text, resolved, created_at"
 #             )
 #             .eq("canvas_id", canvas_id)
@@ -1226,6 +1310,8 @@
 #             raise ValueError("Comment cannot be empty")
 #         if len(content) > 4000:
 #             raise ValueError("Comment is too long")
+
+#         self._validate_anchor(anchor_from, anchor_to)
 
 #         row = {
 #             "canvas_id": canvas_id,
@@ -1334,59 +1420,6 @@
 #         return updated.data[0]
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 """
 Canvas database and authorization layer.
 
@@ -1489,11 +1522,15 @@ class CanvasManager:
             editor
             None
 
-        This is the central authorization decision. Covers three paths:
+        This is the central authorization decision. Covers four paths:
         1. Owner
         2. Accepted canvas_members row
         3. canvas.visibility == 'anyone' (open to any authenticated user,
            at whatever permission the link currently grants)
+        4. A pending canvas_invites row matching this user's verified
+           email — auto-redeemed into a canvas_members row on first
+           access, no owner approval needed (they pre-approved by
+           inviting the email in the first place).
         """
 
         self._require_canvas_id(canvas_id)
@@ -1532,7 +1569,101 @@ class CanvasManager:
         if canvas.get("visibility") == "anyone":
             return canvas.get("link_permission") or "viewer"
 
+        redeemed_permission = self._try_redeem_invite(canvas_id, user_id)
+        if redeemed_permission:
+            return redeemed_permission
+
         return None
+
+    def _lookup_email_by_user_id(self, user_id: str) -> Optional[str]:
+        """
+        Best-effort reverse lookup (user_id -> verified email) via the
+        `profiles` mirror table. Never raises — every caller treats a
+        failure here as "couldn't determine email" and degrades
+        gracefully (falls back to the existing request-access flow)
+        rather than breaking the request.
+        """
+        try:
+            result = (
+                supabase
+                .table("profiles")
+                .select("email")
+                .eq("id", user_id)
+                .maybe_single()
+                .execute()
+            )
+            return (result.data or {}).get("email")
+        except Exception:
+            return None
+
+    def _lookup_user_id_by_email(self, email: str) -> Optional[str]:
+        """
+        Best-effort forward lookup (email -> user_id), used only as an
+        optimization in invite_member so an already-registered person
+        gets access immediately instead of waiting for their next
+        visit. Failure here is never fatal — invite_member falls back
+        to the deferred canvas_invites path either way.
+        """
+        try:
+            result = (
+                supabase
+                .table("profiles")
+                .select("id")
+                .eq("email", email)
+                .maybe_single()
+                .execute()
+            )
+            return (result.data or {}).get("id")
+        except Exception:
+            return None
+
+    def _try_redeem_invite(self, canvas_id: str, user_id: str) -> Optional[str]:
+        """
+        If this user's verified email matches a pending invite for
+        this canvas, grant access now and mark the invite consumed.
+        Every step degrades to "no redemption" on failure — this runs
+        on the hot path of every access check for non-members, so it
+        must never be the reason a request 500s.
+        """
+        email = self._lookup_email_by_user_id(user_id)
+        if not email:
+            return None
+
+        try:
+            invite = (
+                supabase
+                .table("canvas_invites")
+                .select("id, permission")
+                .eq("canvas_id", canvas_id)
+                .eq("email", email.lower())
+                .is_("redeemed_by", "null")
+                .maybe_single()
+                .execute()
+            )
+        except Exception:
+            return None
+
+        if not invite.data:
+            return None
+
+        permission = invite.data["permission"]
+
+        try:
+            supabase.table("canvas_members").insert({
+                "canvas_id": canvas_id,
+                "user_id": user_id,
+                "permission": permission,
+                "status": "accepted",
+            }).execute()
+
+            supabase.table("canvas_invites").update({
+                "redeemed_by": user_id,
+                "redeemed_at": self._now(),
+            }).eq("id", invite.data["id"]).execute()
+        except Exception:
+            return None
+
+        return permission
 
     def require_view_access(self, canvas_id: str, user_id: str) -> str:
         access = self.get_canvas_access(canvas_id, user_id)
@@ -2456,7 +2587,6 @@ class CanvasManager:
     # Restricted access: members (direct invite + management)
     # ============================================================
 
-
     def invite_member(
         self,
         canvas_id: str,
@@ -2465,142 +2595,121 @@ class CanvasManager:
         permission: str,
     ) -> Dict[str, Any]:
         """
-        Create a pending canvas invitation for an email address.
+        Owner grants access to an email address — whether or not that
+        person has ever used the app. If they already have an account,
+        access is granted immediately. Otherwise this just records the
+        invite; it's auto-redeemed the moment that email verifies via
+        the passwordless OTP gate and opens the canvas link (see
+        _try_redeem_invite, called from get_canvas_access).
 
-        The invited person does NOT need to have an account yet.
-
-        The invitation remains pending until the recipient authenticates
-        with the invited email address and accepts the invitation.
+        Every lookup here is best-effort — a failure never blocks the
+        invite itself from being recorded.
         """
 
         self.require_owner(canvas_id, owner_id)
 
         allowed_permissions = {"viewer", "commenter", "editor"}
-
         if permission not in allowed_permissions:
             raise ValueError("Invalid permission")
 
         email = (email or "").strip().lower()
-
         if not email:
             raise ValueError("Email is required")
+        if len(email) > 320 or "@" not in email:
+            raise ValueError("That doesn't look like a valid email")
 
-        # Basic email validation.
-        if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
-            raise ValueError("Please enter a valid email address")
+        existing_user_id = self._lookup_user_id_by_email(email)
 
-        # Owner cannot invite themselves.
-        owner_profile = (
-            supabase
-            .table("profiles")
-            .select("email")
-            .eq("id", owner_id)
-            .maybe_single()
-            .execute()
-        )
+        if existing_user_id:
+            if existing_user_id == owner_id:
+                raise ValueError("You already own this canvas")
 
-        if (
-            owner_profile.data
-            and owner_profile.data.get("email")
-            and owner_profile.data["email"].strip().lower() == email
-        ):
-            raise ValueError("You already own this canvas")
-
-        # ------------------------------------------------------------
-        # Generate a random invitation token.
-        #
-        # Raw token:
-        #   sent to the client in the invitation URL
-        #
-        # Hash:
-        #   stored in the database
-        #
-        # We NEVER store the raw invitation token.
-        # ------------------------------------------------------------
-
-        raw_token = secrets.token_urlsafe(32)
-        token_hash = self._hash_share_token(raw_token)
-
-        # ------------------------------------------------------------
-        # Check whether this email already has an invitation
-        # for this canvas.
-        # ------------------------------------------------------------
-
-
-
-        existing = (
-            supabase
-            .table("canvas_invitations")
-            .select("id, status")
-            .eq("canvas_id", canvas_id)
-            .eq("email", email)
-            .limit(1)
-            .execute()
-        )
-
-        existing_row = existing.data[0] if existing and existing.data else None
-
-        if existing_row:
-            # Re-inviting the same email updates the existing invitation.
-            updated = (
+            existing_member = (
                 supabase
-                .table("canvas_invitations")
-                .update({
-                    "permission": permission,
-                    "status": "pending",
-                    "invited_by": owner_id,
-                    "token_hash": token_hash,
-                    "accepted_at": None,
-                })
-                .eq("id", existing_row["id"])
+                .table("canvas_members")
+                .select("id")
+                .eq("canvas_id", canvas_id)
+                .eq("user_id", existing_user_id)
+                .maybe_single()
                 .execute()
             )
 
-            if not updated.data:
-                raise RuntimeError("Failed to update canvas invitation")
-
-            invitation = updated.data[0]
-
-        else:
-            # New invitation.
-            created = (
-                supabase
-                .table("canvas_invitations")
-                .insert({
+            if existing_member.data:
+                supabase.table("canvas_members").update({
+                    "permission": permission,
+                    "status": "accepted",
+                }).eq("id", existing_member.data["id"]).execute()
+            else:
+                supabase.table("canvas_members").insert({
                     "canvas_id": canvas_id,
-                    "email": email,
+                    "user_id": existing_user_id,
                     "permission": permission,
-                    "status": "pending",
-                    "invited_by": owner_id,
-                    "token_hash": token_hash,
-                })
-                .execute()
+                    "status": "accepted",
+                }).execute()
+
+            self._notify(
+                user_id=existing_user_id,
+                canvas_id=canvas_id,
+                type_="added_to_canvas",
+                payload={},
             )
 
-            if not created.data:
-                raise RuntimeError("Failed to create canvas invitation")
+            return {
+                "email": email,
+                "permission": permission,
+                "status": "accepted",
+                "pending_signup": False,
+            }
 
-            invitation = created.data[0]
-
-       
-
-        # ------------------------------------------------------------
-        # IMPORTANT:
-        #
-        # We do NOT create canvas_members here.
-        #
-        # canvas_members will be created only after the client
-        # authenticates and the email matches this invitation.
-        # ------------------------------------------------------------
+        # No account yet — record the invite. Upsert so re-inviting the
+        # same email just updates the permission rather than erroring.
+        supabase.table("canvas_invites").upsert(
+            {
+                "canvas_id": canvas_id,
+                "email": email,
+                "permission": permission,
+                "invited_by": owner_id,
+            },
+            on_conflict="canvas_id,email",
+        ).execute()
 
         return {
-            "id": invitation["id"],
-            "canvas_id": canvas_id,
             "email": email,
-            "permission": invitation["permission"],
-            "status": invitation["status"],
-            "token": raw_token,
+            "permission": permission,
+            "status": "pending_signup",
+            "pending_signup": True,
         }
+
+    def list_pending_invites(self, canvas_id: str, owner_id: str) -> List[Dict[str, Any]]:
+        self.require_owner(canvas_id, owner_id)
+
+        result = (
+            supabase
+            .table("canvas_invites")
+            .select("id, email, permission, created_at")
+            .eq("canvas_id", canvas_id)
+            .is_("redeemed_by", "null")
+            .order("created_at", desc=False)
+            .execute()
+        )
+
+        return result.data or []
+
+    def revoke_invite(self, canvas_id: str, owner_id: str, invite_id: str) -> None:
+        self.require_owner(canvas_id, owner_id)
+
+        result = (
+            supabase
+            .table("canvas_invites")
+            .delete()
+            .eq("id", invite_id)
+            .eq("canvas_id", canvas_id)
+            .is_("redeemed_by", "null")
+            .execute()
+        )
+
+        if not result.data:
+            raise LookupError("Invite not found")
 
     def list_members(self, canvas_id: str, owner_id: str) -> List[Dict[str, Any]]:
         self.require_owner(canvas_id, owner_id)
