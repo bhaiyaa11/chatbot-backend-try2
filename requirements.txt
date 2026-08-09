@@ -175,4 +175,4 @@ youtube-transcript-api==1.2.4
 yt-dlp==2026.3.3
 zipp==3.23.0
 zstandard==0.25.0
-slowapi==0.1.0
+slowapi==0.1.10
