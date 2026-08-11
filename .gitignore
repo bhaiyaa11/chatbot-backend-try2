@@ -22,3 +22,6 @@ generated_audio/*.mp3
 generated_videos/
 generated_video/*
 generated_video/*.mp4
+generated_storyboards/
+generated_storyboards/*
+generated_storyboards/*.png

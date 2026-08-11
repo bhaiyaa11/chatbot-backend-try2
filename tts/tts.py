@@ -29,6 +29,7 @@ import asyncio
 
 from pathlib import Path
 from typing import Dict
+import base64
 
 from dotenv import load_dotenv
 
@@ -85,72 +86,7 @@ VOICE_AGENTS = {
     "american_male":         {"voice_id": os.getenv("VOICE_AMERICAN_MALE")},
     "american_female":       {"voice_id": os.getenv("VOICE_AMERICAN_FEMALE")},
     "indian_male":           {"voice_id": os.getenv("VOICE_INDIAN_MALE")},
-    "indian_female":         {"voice_id": os.getenv("VOICE_INDIAN_FEMALE")},
-    "MARK_AMERICAN_MALE":    {"voice_id": os.getenv("MARK")},
-    "KAIRA_AMERICAN_FEMALE": {"voice_id": os.getenv("KAIRA")},
-    "TANYA_AUSSIE_SOCIALMEDIA":                 {"voice_id": os.getenv("TANYA_AUSSIE_SOCIALMEDIA")},
-    "MIKE_AUSSIE_SOCIALMEDIA":                 {"voice_id": os.getenv("MIKE_AUSSIE_SOCIALMEDIA")},
-    "PETTER_AUSSIE_ADVERTISEMENT":                 {"voice_id": os.getenv("PETTER_AUSSIE_ADVERTISEMENT")},
-    "BECCA_AUSSIE_ADVERTISEMENT":                 {"voice_id": os.getenv("BECCA_AUSSIE_ADVERTISEMENT")},
-    "LILY_AUSSIE_CONVERSATIONAL":                 {"voice_id": os.getenv("LILY_AUSSIE_CONVERSATIONAL")},
-    "SERENA_AMERICAN_SOCIALMEDIA":                 {"voice_id": os.getenv("SERENA_AMERICAN_SOCIALMEDIA")},
     "BLONDE_BRITISH_FEMALE":                 {"voice_id": os.getenv("BLONDE_BRITISH_FEMALE")},
-    "EFFIE_BRITISH_ADVERTISEMENT":                 {"voice_id": os.getenv("EFFIE_BRITISH_ADVERTISEMENT")},
-    "ASHER_BRITISH_SOCIALMEDIA":                 {"voice_id": os.getenv("ASHER_BRITISH_SOCIALMEDIA")},
-    "MR_DAVID_BRIT_CONVO_MALE_OLD":                 {"voice_id": os.getenv("MR_DAVID_BRIT_CONVO_MALE_OLD")}, 
-    "SAMMY_AEMRICAN_CONVO_NUETRAL_YOUNG":         {"voice_id": os.getenv("SAMMY_AEMRICAN_CONVO_NUETRAL_YOUNG")},
-    "ELLIS_BRIT_YOUNG_M_CONVO":         {"voice_id": os.getenv("ELLIS_BRIT_YOUNG_M_CONVO")},
-    "JAMES_BRIT_YOUNG_M_CONVO":         {"voice_id": os.getenv("JAMES_BRIT_YOUNG_M_CONVO")},
-    "JACK_BRIT_YOUNG_M_CONVO":         {"voice_id": os.getenv("JACK_BRIT_YOUNG_M_CONVO")},
-    "LLOYD_BRIT_YOUNG_M_SM":         {"voice_id": os.getenv("LLOYD_BRIT_YOUNG_M_SM")},
-    "JOSH_BRIT_YOUNG_M_SM":         {"voice_id": os.getenv("JOSH_BRIT_YOUNG_M_SM")},
-    "HARRY_BRIT_YOUNG_M_SM":         {"voice_id": os.getenv("HARRY_BRIT_YOUNG_M_SM")},
-    "ALFIE_BRIT_YOUNG_M_AD":         {"voice_id": os.getenv("ALFIE_BRIT_YOUNG_M_AD")},
-    "ROCK_BRIT_YOUNG_M_AD":         {"voice_id": os.getenv("ROCK_BRIT_YOUNG_M_AD")},
-    "JAMES_BRIT_YOUNG_M_AD":         {"voice_id": os.getenv("JAMES_BRIT_YOUNG_M_AD")},
-    "JAMES_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("JAMES_BRIT_MID_M_CONVO")},
-    "FINN_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("FINN_BRIT_MID_M_CONVO")},
-    "MARTIN_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("MARTIN_BRIT_MID_M_CONVO")},
-    "DANIEL_BRIT_MID_M_SM": {"voice_id": os.getenv("DANIEL_BRIT_MID_M_SM")},
-    "MYSTERIOUS_BRIT_MID_M_SM": {"voice_id": os.getenv("MYSTERIOUS_BRIT_MID_M_SM")},
-    "EDMUND_BRIT_MID_M_SM": {"voice_id": os.getenv("EDMUND_BRIT_MID_M_SM")},
-    "RUSS_BRIT_MID_AD":{"voice_id": os.getenv("RUSS_BRIT_MID_AD")},
-    "CONOR_BRIT_MID_AD":{"voice_id": os.getenv("CONOR_BRIT_MID_AD")},
-    "CHRIS_BRIT_MID_AD":{"voice_id": os.getenv("CHRIS_BRIT_MID_AD")},
-    "grandpa_brit_ad":{"voice_id": os.getenv("grandpa_brit_ad")},
-    "JOE_brit_old_sm":{"voice_id": os.getenv("JOE_brit_old_sm")},
-    "DAN_brit_old_sm":{"voice_id": os.getenv("DAN_brit_old_sm")},
-    "sam_brit_ad":{"voice_id": os.getenv("sam_brit_ad")},
-    "KATRINA_BRIT_YOUNG_F_CONVO":         {"voice_id": os.getenv("KATRINA_BRIT_YOUNG_F_CONVO")},
-    "ABIGAIL_BRIT_YOUNG_F_CONVO":         {"voice_id": os.getenv("ABIGAIL_BRIT_YOUNG_F_CONVO")},
-    "Charlotte_BRIT_YOUNG_F_CONVO":{"voice_id":os.getenv("Charlotte_BRIT_YOUNG_F_CONVO")},
-    "PEACH_BRIT_YOUNG_F_SM":{"voice_id":os.getenv("PEACH_BRIT_YOUNG_F_SM")},
-    "KRISTY_BRIT_YOUNG_F_SM":{"voice_id":os.getenv("KRISTY_BRIT_YOUNG_F_SM")},
-    "EFFY_BRIT_YOUNG_F_AD":{"voice_id":os.getenv("EFFY_BRIT_YOUNG_F_AD")},
-    "PEPPER_BRIT_YOUNG_F_AD":{"voice_id":os.getenv("PEPPER_BRIT_YOUNG_F_AD")},
-    "SERENA_BRIT_YOUNG_F_AD":{"voice_id":os.getenv("SERENA_BRIT_YOUNG_F_AD")},
-    "PIA_BRIT_MID_F_CONVO":{"voice_id":os.getenv("PIA_BRIT_MID_F_CONVO")},
-    "VALORY_BRIT_MID_F_CONVO":{"voice_id":os.getenv("VALORY_BRIT_MID_F_CONVO")},
-    "KATIE_BRIT_MID_F_CONVO":{"voice_id":os.getenv("KATIE_BRIT_MID_F_CONVO")},
-    "AIR_BRIT_MID_F_SM":{"voice_id":os.getenv("AIR_BRIT_MID_F_SM")},
-    "SAMARA_BRIT_MID_F_SM":{"voice_id":os.getenv("SAMARA_BRIT_MID_F_SM")},
-    "IMOGEN_BRIT_MID_F_SM":{"voice_id":os.getenv("IMOGEN_BRIT_MID_F_SM")},
-    "VELVET_BRIT_MID_F_AD":{"voice_id":os.getenv("VELVET_BRIT_MID_F_AD")},
-    "EMILY_BRIT_MID_F_AD":{"voice_id":os.getenv("EMILY_BRIT_MID_F_AD")},
-    "BEATRICE_BRIT_OLD_CONVO":{"voice_id":os.getenv("BEATRICE_BRIT_OLD_CONVO")},
-    "JANE_BRIT_OLD_SM":{"voice_id":os.getenv("JANE_BRIT_OLD_SM")},
-    "ELEANOR_BRIT_OLD_AD":{"voice_id":os.getenv("ELEANOR_BRIT_OLD_AD")},
-    "EVELYN_BRIT_YOUNG_N_CONVO":{"voice_id":os.getenv("EVELYN_BRIT_YOUNG_N_CONVO")},
-    "MARSHAL_BRIT_MID_N_CONVO":{"voice_id":os.getenv("MARSHAL_BRIT_MID_N_CONVO")},
-    "DARCY_BRIT_MID_N_SM":{"voice_id":os.getenv("DARCY_BRIT_MID_N_SM")},
-    
-
-
-    
-    
-
-
-    
 }
 
 # ============================================================
@@ -397,28 +333,57 @@ async def stream_audio_chunks(
         if chunk:
             yield chunk
 
+# async def generate_full_audio(
+#     script: str,
+#     metadata: Dict,
+#     voice_type: str,
+# ) -> bytes:
+
+#     voice_agent    = VOICE_AGENTS[voice_type]
+#     voice_settings = build_voice_settings(metadata)
+
+#     pcm_bytes = b""
+
+#     async for chunk in eleven_client.text_to_speech.convert(
+#         voice_id=voice_agent["voice_id"],
+#         model_id="eleven_multilingual_v2",
+#         text=directed_script,
+#         output_format=OUTPUT_FORMAT,   # pcm_22050 — raw samples
+#         voice_settings=voice_settings
+#     ):
+#         if chunk:
+#             pcm_bytes += chunk
+
+#     return pcm_bytes
+
+
 async def generate_full_audio(
     script: str,
     metadata: Dict,
     voice_type: str,
-) -> bytes:
+) -> Dict:
 
-    voice_agent    = VOICE_AGENTS[voice_type]
+    voice_agent = VOICE_AGENTS[voice_type]
     voice_settings = build_voice_settings(metadata)
 
-    pcm_bytes = b""
+    tts_text = script
 
-    async for chunk in eleven_client.text_to_speech.convert(
+    response = await eleven_client.text_to_speech.convert_with_timestamps(
         voice_id=voice_agent["voice_id"],
+        text=tts_text,
         model_id="eleven_multilingual_v2",
-        text=directed_script,
-        output_format=OUTPUT_FORMAT,   # pcm_22050 — raw samples
-        voice_settings=voice_settings
-    ):
-        if chunk:
-            pcm_bytes += chunk
+        output_format=OUTPUT_FORMAT,
+        voice_settings=voice_settings,
+    )
 
-    return pcm_bytes
+    audio_bytes = base64.b64decode(response.audio_base64)
+
+    alignment = response.alignment
+
+    return {
+        "audio_bytes": audio_bytes,
+        "alignment": alignment,
+    }
 
 # ============================================================
 # STEP 5 — WAV EXPORT
@@ -470,16 +435,41 @@ async def generate_cinematic_voiceover(
     # STEP 3 — Generate full audio in one ElevenLabs call
     # ----------------------------------------------------------
     print("\nSTEP 3: Generating audio...")
-    try:
-        pcm_bytes = await generate_full_audio(
-            script=narration_script,
-            metadata=metadata,
-            voice_type=voice_type,
+    # try:
+    #     pcm_bytes = await generate_full_audio(
+    #         script=narration_script,
+    #         metadata=metadata,
+    #         voice_type=voice_type,
+    #     )
+    #     print(f"  Received {len(pcm_bytes):,} PCM bytes")
+    # except Exception as e:
+    #     print(f"  ERROR during audio generation: {e}")
+    #     raise
+    
+    tts_result = await generate_full_audio(
+        script=narration_script,
+        metadata=metadata,
+        voice_type=voice_type,
+    )
+
+    pcm_bytes = tts_result["audio_bytes"]
+    alignment = tts_result["alignment"]
+
+    print(f"  Received {len(pcm_bytes):,} PCM bytes")
+    print(f"  Alignment received: {alignment is not None}")
+
+    if alignment:
+        print("\n========== ALIGNMENT TEST ==========")
+        print("Characters:", alignment.characters[:20])
+        print(
+            "Start times:",
+            alignment.character_start_times_seconds[:20]
         )
-        print(f"  Received {len(pcm_bytes):,} PCM bytes")
-    except Exception as e:
-        print(f"  ERROR during audio generation: {e}")
-        raise
+        print(
+            "End times:",
+            alignment.character_end_times_seconds[:20]
+        )
+        print("====================================\n")
 
     # ----------------------------------------------------------
     # STEP 4 — Save as WAV
@@ -519,3 +509,71 @@ if __name__ == "__main__":
     )
 
     print(result)
+
+
+
+
+
+
+
+
+
+#  "indian_female":         {"voice_id": os.getenv("VOICE_INDIAN_FEMALE")},
+#     "MARK_AMERICAN_MALE":    {"voice_id": os.getenv("MARK")},
+#     "KAIRA_AMERICAN_FEMALE": {"voice_id": os.getenv("KAIRA")},
+#     "TANYA_AUSSIE_SOCIALMEDIA":                 {"voice_id": os.getenv("TANYA_AUSSIE_SOCIALMEDIA")},
+#     "MIKE_AUSSIE_SOCIALMEDIA":                 {"voice_id": os.getenv("MIKE_AUSSIE_SOCIALMEDIA")},
+#     "PETTER_AUSSIE_ADVERTISEMENT":                 {"voice_id": os.getenv("PETTER_AUSSIE_ADVERTISEMENT")},
+#     "BECCA_AUSSIE_ADVERTISEMENT":                 {"voice_id": os.getenv("BECCA_AUSSIE_ADVERTISEMENT")},
+#     "LILY_AUSSIE_CONVERSATIONAL":                 {"voice_id": os.getenv("LILY_AUSSIE_CONVERSATIONAL")},
+#     "SERENA_AMERICAN_SOCIALMEDIA":                 {"voice_id": os.getenv("SERENA_AMERICAN_SOCIALMEDIA")},
+#     "BLONDE_BRITISH_FEMALE":                 {"voice_id": os.getenv("BLONDE_BRITISH_FEMALE")},
+#     "EFFIE_BRITISH_ADVERTISEMENT":                 {"voice_id": os.getenv("EFFIE_BRITISH_ADVERTISEMENT")},
+#     "ASHER_BRITISH_SOCIALMEDIA":                 {"voice_id": os.getenv("ASHER_BRITISH_SOCIALMEDIA")},
+#     "MR_DAVID_BRIT_CONVO_MALE_OLD":                 {"voice_id": os.getenv("MR_DAVID_BRIT_CONVO_MALE_OLD")}, 
+#     "SAMMY_AEMRICAN_CONVO_NUETRAL_YOUNG":         {"voice_id": os.getenv("SAMMY_AEMRICAN_CONVO_NUETRAL_YOUNG")},
+#     "ELLIS_BRIT_YOUNG_M_CONVO":         {"voice_id": os.getenv("ELLIS_BRIT_YOUNG_M_CONVO")},
+#     "JAMES_BRIT_YOUNG_M_CONVO":         {"voice_id": os.getenv("JAMES_BRIT_YOUNG_M_CONVO")},
+#     "JACK_BRIT_YOUNG_M_CONVO":         {"voice_id": os.getenv("JACK_BRIT_YOUNG_M_CONVO")},
+#     "LLOYD_BRIT_YOUNG_M_SM":         {"voice_id": os.getenv("LLOYD_BRIT_YOUNG_M_SM")},
+#     "JOSH_BRIT_YOUNG_M_SM":         {"voice_id": os.getenv("JOSH_BRIT_YOUNG_M_SM")},
+#     "HARRY_BRIT_YOUNG_M_SM":         {"voice_id": os.getenv("HARRY_BRIT_YOUNG_M_SM")},
+#     "ALFIE_BRIT_YOUNG_M_AD":         {"voice_id": os.getenv("ALFIE_BRIT_YOUNG_M_AD")},
+#     "ROCK_BRIT_YOUNG_M_AD":         {"voice_id": os.getenv("ROCK_BRIT_YOUNG_M_AD")},
+#     "JAMES_BRIT_YOUNG_M_AD":         {"voice_id": os.getenv("JAMES_BRIT_YOUNG_M_AD")},
+#     "JAMES_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("JAMES_BRIT_MID_M_CONVO")},
+#     "FINN_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("FINN_BRIT_MID_M_CONVO")},
+#     "MARTIN_BRIT_MID_M_CONVO":         {"voice_id": os.getenv("MARTIN_BRIT_MID_M_CONVO")},
+#     "DANIEL_BRIT_MID_M_SM": {"voice_id": os.getenv("DANIEL_BRIT_MID_M_SM")},
+#     "MYSTERIOUS_BRIT_MID_M_SM": {"voice_id": os.getenv("MYSTERIOUS_BRIT_MID_M_SM")},
+#     "EDMUND_BRIT_MID_M_SM": {"voice_id": os.getenv("EDMUND_BRIT_MID_M_SM")},
+#     "RUSS_BRIT_MID_AD":{"voice_id": os.getenv("RUSS_BRIT_MID_AD")},
+#     "CONOR_BRIT_MID_AD":{"voice_id": os.getenv("CONOR_BRIT_MID_AD")},
+#     "CHRIS_BRIT_MID_AD":{"voice_id": os.getenv("CHRIS_BRIT_MID_AD")},
+#     "grandpa_brit_ad":{"voice_id": os.getenv("grandpa_brit_ad")},
+#     "JOE_brit_old_sm":{"voice_id": os.getenv("JOE_brit_old_sm")},
+#     "DAN_brit_old_sm":{"voice_id": os.getenv("DAN_brit_old_sm")},
+#     "sam_brit_ad":{"voice_id": os.getenv("sam_brit_ad")},
+#     "KATRINA_BRIT_YOUNG_F_CONVO":         {"voice_id": os.getenv("KATRINA_BRIT_YOUNG_F_CONVO")},
+#     "ABIGAIL_BRIT_YOUNG_F_CONVO":         {"voice_id": os.getenv("ABIGAIL_BRIT_YOUNG_F_CONVO")},
+#     "Charlotte_BRIT_YOUNG_F_CONVO":{"voice_id":os.getenv("Charlotte_BRIT_YOUNG_F_CONVO")},
+#     "PEACH_BRIT_YOUNG_F_SM":{"voice_id":os.getenv("PEACH_BRIT_YOUNG_F_SM")},
+#     "KRISTY_BRIT_YOUNG_F_SM":{"voice_id":os.getenv("KRISTY_BRIT_YOUNG_F_SM")},
+#     "EFFY_BRIT_YOUNG_F_AD":{"voice_id":os.getenv("EFFY_BRIT_YOUNG_F_AD")},
+#     "PEPPER_BRIT_YOUNG_F_AD":{"voice_id":os.getenv("PEPPER_BRIT_YOUNG_F_AD")},
+#     "SERENA_BRIT_YOUNG_F_AD":{"voice_id":os.getenv("SERENA_BRIT_YOUNG_F_AD")},
+#     "PIA_BRIT_MID_F_CONVO":{"voice_id":os.getenv("PIA_BRIT_MID_F_CONVO")},
+#     "VALORY_BRIT_MID_F_CONVO":{"voice_id":os.getenv("VALORY_BRIT_MID_F_CONVO")},
+#     "KATIE_BRIT_MID_F_CONVO":{"voice_id":os.getenv("KATIE_BRIT_MID_F_CONVO")},
+#     "AIR_BRIT_MID_F_SM":{"voice_id":os.getenv("AIR_BRIT_MID_F_SM")},
+#     "SAMARA_BRIT_MID_F_SM":{"voice_id":os.getenv("SAMARA_BRIT_MID_F_SM")},
+#     "IMOGEN_BRIT_MID_F_SM":{"voice_id":os.getenv("IMOGEN_BRIT_MID_F_SM")},
+#     "VELVET_BRIT_MID_F_AD":{"voice_id":os.getenv("VELVET_BRIT_MID_F_AD")},
+#     "EMILY_BRIT_MID_F_AD":{"voice_id":os.getenv("EMILY_BRIT_MID_F_AD")},
+#     "BEATRICE_BRIT_OLD_CONVO":{"voice_id":os.getenv("BEATRICE_BRIT_OLD_CONVO")},
+#     "JANE_BRIT_OLD_SM":{"voice_id":os.getenv("JANE_BRIT_OLD_SM")},
+#     "ELEANOR_BRIT_OLD_AD":{"voice_id":os.getenv("ELEANOR_BRIT_OLD_AD")},
+#     "EVELYN_BRIT_YOUNG_N_CONVO":{"voice_id":os.getenv("EVELYN_BRIT_YOUNG_N_CONVO")},
+#     "MARSHAL_BRIT_MID_N_CONVO":{"voice_id":os.getenv("MARSHAL_BRIT_MID_N_CONVO")},
+#     "DARCY_BRIT_MID_N_SM":{"voice_id":os.getenv("DARCY_BRIT_MID_N_SM")},
+    

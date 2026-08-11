@@ -1,4 +1,3 @@
-
 # """
 # Canvas API routes.
 
@@ -22,9 +21,12 @@
 # from pydantic import BaseModel, Field
 # from slowapi import Limiter
 # from slowapi.util import get_remote_address
+# import logging
 
 # from api.auth import get_current_user
 # from canvas.canvas_manager import CanvasManager
+
+# logger = logging.getLogger(__name__)
 
 
 # router = APIRouter(
@@ -38,8 +40,8 @@
 
 # canvas_manager = CanvasManager()
 
-# # FRONTEND_ORIGIN = "http://localhost:5173"
-# FRONTEND_ORIGIN = "https://chatbot-aim.vercel.app/"
+# FRONTEND_ORIGIN = "http://localhost:5173"
+# # FRONTEND_ORIGIN = "https://chatbot-aim.vercel.app/"
 
 # # Rate limiting for the *unauthenticated* public-link endpoints below.
 # # These have no JWT, so there's no per-user identity to hold
@@ -134,6 +136,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to create canvas")
 #         raise HTTPException(status_code=500, detail="Failed to create canvas")
 
 
@@ -143,6 +146,7 @@
 #         canvases = canvas_manager.list_canvases(user_id=user_id)
 #         return {"canvases": canvases}
 #     except Exception:
+#         logger.exception("Failed to load canvases")
 #         raise HTTPException(status_code=500, detail="Failed to load canvases")
 
 
@@ -158,6 +162,7 @@
 #     except HTTPException:
 #         raise
 #     except Exception:
+#         logger.exception("Failed to load canvas")
 #         raise HTTPException(status_code=500, detail="Failed to load canvas")
 
 
@@ -175,6 +180,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to check access")
 #         raise HTTPException(status_code=500, detail="Failed to check access")
 
 
@@ -194,6 +200,7 @@
 #     except LookupError:
 #         raise HTTPException(status_code=404, detail="Canvas not found")
 #     except Exception:
+#         logger.exception("Failed to update canvas")
 #         raise HTTPException(status_code=500, detail="Failed to update canvas")
 
 
@@ -215,6 +222,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to update canvas")
 #         raise HTTPException(status_code=500, detail="Failed to update canvas")
 
 
@@ -228,6 +236,7 @@
 #     except LookupError:
 #         raise HTTPException(status_code=404, detail="Canvas not found")
 #     except Exception:
+#         logger.exception("Failed to delete canvas")
 #         raise HTTPException(status_code=500, detail="Failed to delete canvas")
 
 
@@ -253,6 +262,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to update visibility")
 #         raise HTTPException(status_code=500, detail="Failed to update visibility")
 
 
@@ -281,6 +291,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to create share link")
 #         raise HTTPException(status_code=500, detail="Failed to create share link")
 
 
@@ -294,6 +305,7 @@
 #     except LookupError:
 #         raise HTTPException(status_code=404, detail="Canvas not found")
 #     except Exception:
+#         logger.exception("Failed to load share settings")
 #         raise HTTPException(status_code=500, detail="Failed to load share settings")
 
 
@@ -317,6 +329,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to update share settings")
 #         raise HTTPException(status_code=500, detail="Failed to update share settings")
 
 
@@ -330,6 +343,7 @@
 #     except LookupError:
 #         raise HTTPException(status_code=404, detail="Canvas not found")
 #     except Exception:
+#         logger.exception("Failed to revoke share link")
 #         raise HTTPException(status_code=500, detail="Failed to revoke share link")
 
 
@@ -354,6 +368,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to regenerate share link")
 #         raise HTTPException(status_code=500, detail="Failed to regenerate share link")
 
 
@@ -371,6 +386,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to request access")
 #         raise HTTPException(status_code=500, detail="Failed to request access")
 
 
@@ -382,6 +398,7 @@
 #     except PermissionError:
 #         raise HTTPException(status_code=403, detail="Only the canvas owner can view access requests")
 #     except Exception:
+#         logger.exception("Failed to load access requests")
 #         raise HTTPException(status_code=500, detail="Failed to load access requests")
 
 
@@ -405,6 +422,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to approve access request")
 #         raise HTTPException(status_code=500, detail="Failed to approve access request")
 
 
@@ -424,6 +442,7 @@
 #     except LookupError:
 #         raise HTTPException(status_code=404, detail="Access request not found")
 #     except Exception:
+#         logger.exception("Failed to deny access request")
 #         raise HTTPException(status_code=500, detail="Failed to deny access request")
 
 
@@ -439,6 +458,7 @@
 #     except PermissionError:
 #         raise HTTPException(status_code=403, detail="Only the canvas owner can view members")
 #     except Exception:
+#         logger.exception("Failed to load members")
 #         raise HTTPException(status_code=500, detail="Failed to load members")
 
 
@@ -458,12 +478,10 @@
 #         raise HTTPException(status_code=403, detail="Only the canvas owner can invite people")
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
-#     # except Exception:
-#     #     raise HTTPException(status_code=500, detail="Failed to invite member")
-#     except Exception as exc:
-#         import traceback
-#         traceback.print_exc()
-#         raise HTTPException(status_code=500, detail=str(exc))
+#     except Exception:
+#         logger.exception("Failed to invite member")
+#         raise HTTPException(status_code=500, detail="Failed to invite member")
+
 
 # @router.patch("/{canvas_id}/members/{member_id}")
 # def update_member(
@@ -485,6 +503,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to update member")
 #         raise HTTPException(status_code=500, detail="Failed to update member")
 
 
@@ -498,7 +517,34 @@
 #     except LookupError:
 #         raise HTTPException(status_code=404, detail="Member not found")
 #     except Exception:
+#         logger.exception("Failed to remove member")
 #         raise HTTPException(status_code=500, detail="Failed to remove member")
+
+
+# @router.get("/{canvas_id}/invites")
+# def list_pending_invites(canvas_id: str, user_id: str = Depends(get_current_user)):
+#     try:
+#         invites = canvas_manager.list_pending_invites(canvas_id=canvas_id, owner_id=user_id)
+#         return {"invites": invites}
+#     except PermissionError:
+#         raise HTTPException(status_code=403, detail="Only the canvas owner can view invites")
+#     except Exception:
+#         logger.exception("Failed to load invites")
+#         raise HTTPException(status_code=500, detail="Failed to load invites")
+
+
+# @router.delete("/{canvas_id}/invites/{invite_id}")
+# def revoke_invite(canvas_id: str, invite_id: str, user_id: str = Depends(get_current_user)):
+#     try:
+#         canvas_manager.revoke_invite(canvas_id=canvas_id, owner_id=user_id, invite_id=invite_id)
+#         return {"status": "revoked"}
+#     except PermissionError:
+#         raise HTTPException(status_code=403, detail="Only the canvas owner can revoke invites")
+#     except LookupError:
+#         raise HTTPException(status_code=404, detail="Invite not found")
+#     except Exception:
+#         logger.exception("Failed to revoke invite")
+#         raise HTTPException(status_code=500, detail="Failed to revoke invite")
 
 
 # # ================================================================
@@ -513,6 +559,7 @@
 #     except PermissionError:
 #         raise HTTPException(status_code=403, detail="You do not have access to this canvas")
 #     except Exception:
+#         logger.exception("Failed to load comments")
 #         raise HTTPException(status_code=500, detail="Failed to load comments")
 
 
@@ -534,6 +581,7 @@
 #     except ValueError as exc:
 #         raise HTTPException(status_code=400, detail=str(exc))
 #     except Exception:
+#         logger.exception("Failed to create comment")
 #         raise HTTPException(status_code=500, detail="Failed to create comment")
 
 
@@ -555,6 +603,7 @@
 #     except LookupError:
 #         raise HTTPException(status_code=404, detail="Comment not found")
 #     except Exception:
+#         logger.exception("Failed to update comment")
 #         raise HTTPException(status_code=500, detail="Failed to update comment")
 
 
@@ -568,6 +617,7 @@
 #     except LookupError:
 #         raise HTTPException(status_code=404, detail="Comment not found")
 #     except Exception:
+#         logger.exception("Failed to delete comment")
 #         raise HTTPException(status_code=500, detail="Failed to delete comment")
 
 
@@ -599,6 +649,7 @@
 #     except HTTPException:
 #         raise
 #     except Exception:
+#         logger.exception("Failed to load canvas")
 #         raise HTTPException(status_code=500, detail="Failed to load canvas")
 
 # @public_router.patch("/{token}/content")
@@ -614,6 +665,7 @@
 #     except HTTPException:
 #         raise
 #     except Exception:
+#         logger.exception("Failed to update canvas")
 #         raise HTTPException(status_code=500, detail="Failed to update canvas")
 
 
@@ -624,6 +676,7 @@
 #         comments = canvas_manager.list_public_comments(token)
 #         return {"comments": comments}
 #     except Exception:
+#         logger.exception("Failed to load comments")
 #         raise HTTPException(status_code=500, detail="Failed to load comments")
 
 
@@ -649,7 +702,44 @@
 #     except HTTPException:
 #         raise
 #     except Exception:
+#         logger.exception("Failed to create comment")
 #         raise HTTPException(status_code=500, detail="Failed to create comment")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -693,9 +783,21 @@ router = APIRouter(
     tags=["Canvas"],
 )
 
+# Bump this string every time this file (or canvas_manager.py) changes.
+# GET /canvas/health returns it — the single source of truth for
+# "is the code I'm looking at actually what's running on the server
+# right now." Check this BEFORE debugging any canvas behavior.
+CANVAS_API_VERSION = "2026-08-09-restricted-access-fixes-2"
+
 @router.get("/health")
 def canvas_health():
-    return {"status": "canvas api ok"}
+    return {
+        "status": "canvas api ok",
+        "version": CANVAS_API_VERSION,
+        "has_guest_comments": True,
+        "has_canvas_invites": True,
+        "has_rate_limiting": True,
+    }
 
 canvas_manager = CanvasManager()
 
@@ -1201,6 +1303,8 @@ def revoke_invite(canvas_id: str, invite_id: str, user_id: str = Depends(get_cur
         raise HTTPException(status_code=403, detail="Only the canvas owner can revoke invites")
     except LookupError:
         raise HTTPException(status_code=404, detail="Invite not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         logger.exception("Failed to revoke invite")
         raise HTTPException(status_code=500, detail="Failed to revoke invite")
