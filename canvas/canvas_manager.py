@@ -3106,6 +3106,7 @@ CANVAS_SELECT_FIELDS = """
     owner_id,
     title,
     content,
+    storyboard,
     visibility,
     link_access_enabled,
     link_permission,
@@ -3113,6 +3114,11 @@ CANVAS_SELECT_FIELDS = """
     updated_at
 """
 
+# ── Storyboard validation limits ──────────────────────────────
+STORYBOARD_MAX_NODES = 500
+STORYBOARD_MAX_FRAMES = 100
+STORYBOARD_MAX_BYTES = 2_000_000  # 2MB serialized
+STORYBOARD_ALLOWED_VIEW_MODES = {"freeform", "linear"}
 
 class CanvasManager:
 
@@ -3295,6 +3301,50 @@ class CanvasManager:
 
         return result.data
 
+
+
+    def create_storyboard_comment(
+        self,
+        canvas_id: str,
+        user_id: Optional[str],
+        content: str,
+        pin_x: float,
+        pin_y: float,
+        node_id: Optional[str] = None,
+        guest_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+
+        if user_id:
+            self.require_comment_access(canvas_id, user_id)
+
+        content = (content or "").strip()
+        if not content:
+            raise ValueError("Comment cannot be empty")
+        if len(content) > 4000:
+            raise ValueError("Comment is too long")
+
+        self._validate_pin(pin_x, pin_y)
+
+        if node_id is not None and (not isinstance(node_id, str) or len(node_id) > 200):
+            raise ValueError("Invalid node_id")
+
+        row = {
+            "canvas_id": canvas_id,
+            "author_id": user_id,
+            "guest_name": (guest_name or "").strip()[:80] or None,
+            "content": content,
+            "pin_x": pin_x,
+            "pin_y": pin_y,
+            "node_id": node_id,
+        }
+
+        result = supabase.table("canvas_storyboard_comments").insert(row).execute()
+
+        if not result.data:
+            raise RuntimeError("Failed to create storyboard comment")
+
+        return result.data[0]
+
     # ============================================================
     # Access status (for the "Request access" screen)
     # ============================================================
@@ -3457,6 +3507,211 @@ class CanvasManager:
             raise LookupError("Canvas not found")
 
         return result.data[0]
+
+
+    # ============================================================
+    # Storyboard
+    # ============================================================
+
+    @staticmethod
+    def _is_safe_asset_url(url: Optional[str], allowed_prefixes: List[str]) -> bool:
+        """
+        Only allow asset URLs (images/audio) that point at our own
+        backend or an explicitly allowed origin. Mirrors the frontend's
+        isAllowedAssetUrl check — but the frontend check is UX only,
+        this is the actual enforcement point, since the client is
+        never trusted.
+        """
+        if not isinstance(url, str) or not url:
+            return False
+        if len(url) > 2000:
+            return False
+        return any(url.startswith(prefix) for prefix in allowed_prefixes)
+
+    def _validate_storyboard(
+        self,
+        storyboard: Dict[str, Any],
+        allowed_asset_prefixes: List[str],
+    ) -> Dict[str, Any]:
+        """
+        Structural + size validation for a storyboard payload.
+        Raises ValueError on anything malformed or over the limits.
+        Returns a normalized copy — never trusts the input shape as-is.
+        """
+        import json
+
+        if not isinstance(storyboard, dict):
+            raise ValueError("Storyboard must be an object")
+
+        serialized_size = len(json.dumps(storyboard))
+        if serialized_size > STORYBOARD_MAX_BYTES:
+            raise ValueError("Storyboard payload is too large")
+
+        view_mode = storyboard.get("viewMode", "linear")
+        if view_mode not in STORYBOARD_ALLOWED_VIEW_MODES:
+            raise ValueError("Invalid storyboard viewMode")
+
+        frames = storyboard.get("frames", [])
+        nodes = storyboard.get("nodes", [])
+
+        if not isinstance(frames, list) or not isinstance(nodes, list):
+            raise ValueError("Storyboard frames/nodes must be arrays")
+
+        if len(frames) > STORYBOARD_MAX_FRAMES:
+            raise ValueError(f"Too many storyboard frames (max {STORYBOARD_MAX_FRAMES})")
+        if len(nodes) > STORYBOARD_MAX_NODES:
+            raise ValueError(f"Too many storyboard nodes (max {STORYBOARD_MAX_NODES})")
+
+        frame_ids = set()
+        for frame in frames:
+            if not isinstance(frame, dict):
+                raise ValueError("Each frame must be an object")
+            fid = frame.get("id")
+            if not isinstance(fid, str) or not fid:
+                raise ValueError("Each frame requires a string id")
+            frame_ids.add(fid)
+            # Label is free text — never trust it for rendering as HTML,
+            # only ever render as text on the frontend (no dangerouslySetInnerHTML).
+            if not isinstance(frame.get("label", ""), str):
+                raise ValueError("Frame label must be a string")
+
+        node_ids = set()
+        for node in nodes:
+            if not isinstance(node, dict):
+                raise ValueError("Each node must be an object")
+            nid = node.get("id")
+            if not isinstance(nid, str) or not nid:
+                raise ValueError("Each node requires a string id")
+            if nid in node_ids:
+                raise ValueError("Duplicate node id")
+            node_ids.add(nid)
+
+            frame_id = node.get("frameId")
+            if frame_id is not None and frame_id not in frame_ids:
+                raise ValueError("Node references an unknown frameId")
+
+            position = node.get("position")
+            if not isinstance(position, dict) or "x" not in position or "y" not in position:
+                raise ValueError("Each node requires a position {x, y}")
+            if not all(isinstance(position[k], (int, float)) for k in ("x", "y")):
+                raise ValueError("Node position must be numeric")
+
+            data = node.get("data", {})
+            if not isinstance(data, dict):
+                raise ValueError("Node data must be an object")
+
+            # Any asset URL on a node (image, audio) is checked against
+            # the allow-list server-side — this is the real enforcement,
+            # not the frontend's isAllowedAssetUrl (UX only).
+            image_url = data.get("imageUrl")
+            if image_url is not None and not self._is_safe_asset_url(image_url, allowed_asset_prefixes):
+                raise ValueError("Node imageUrl is not an allowed asset URL")
+
+            audio_url = data.get("audioUrl")
+            if audio_url is not None and not self._is_safe_asset_url(audio_url, allowed_asset_prefixes):
+                raise ValueError("Node audioUrl is not an allowed asset URL")
+
+        return storyboard
+
+    def update_canvas_storyboard(
+        self,
+        canvas_id: str,
+        user_id: str,
+        storyboard: Dict[str, Any],
+        allowed_asset_prefixes: List[str],
+    ) -> Dict[str, Any]:
+
+        self.require_edit_access(canvas_id, user_id)
+
+        validated = self._validate_storyboard(storyboard, allowed_asset_prefixes)
+
+        result = (
+            supabase
+            .table("canvases")
+            .update({"storyboard": validated})
+            .eq("id", canvas_id)
+            .execute()
+        )
+
+        if not result.data:
+            raise LookupError("Canvas not found")
+
+        return result.data[0]
+
+    # ============================================================
+    # Storyboard pinned comments
+    # ============================================================
+
+    @staticmethod
+    def _validate_pin(pin_x: float, pin_y: float) -> None:
+        # Sanity bound, not a real canvas size limit — just guards
+        # against garbage/overflow values (e.g. NaN, Infinity, or a
+        # client bug sending something absurd).
+        for value in (pin_x, pin_y):
+            if not isinstance(value, (int, float)) or not (-100_000 <= value <= 100_000):
+                raise ValueError("Invalid pin coordinates")
+
+    def list_storyboard_comments(self, canvas_id: str, user_id: str) -> List[Dict[str, Any]]:
+        self.require_view_access(canvas_id, user_id)
+
+        result = (
+            supabase
+            .table("canvas_storyboard_comments")
+            .select("id, canvas_id, author_id, guest_name, content, pin_x, pin_y, node_id, resolved, created_at")
+            .eq("canvas_id", canvas_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
+
+        return result.data or []
+
+
+    def resolve_storyboard_comment(
+        self,
+        canvas_id: str,
+        user_id: str,
+        comment_id: str,
+        resolved: bool = True,
+    ) -> Dict[str, Any]:
+
+        access = self.require_view_access(canvas_id, user_id)
+        if access not in {"owner", "editor", "commenter"}:
+            raise PermissionError("You cannot resolve comments")
+
+        updated = (
+            supabase
+            .table("canvas_storyboard_comments")
+            .update({"resolved": resolved})
+            .eq("id", comment_id)
+            .eq("canvas_id", canvas_id)
+            .execute()
+        )
+
+        if not updated.data:
+            raise LookupError("Comment not found")
+
+        return updated.data[0]
+
+    def delete_storyboard_comment(self, canvas_id: str, user_id: str, comment_id: str) -> None:
+        access = self.get_canvas_access(canvas_id, user_id)
+
+        result = (
+            supabase
+            .table("canvas_storyboard_comments")
+            .select("id, author_id")
+            .eq("id", comment_id)
+            .eq("canvas_id", canvas_id)
+            .maybe_single()
+            .execute()
+        )
+
+        if not result.data:
+            raise LookupError("Comment not found")
+
+        if result.data["author_id"] != user_id and access != "owner":
+            raise PermissionError("You cannot delete this comment")
+
+        supabase.table("canvas_storyboard_comments").delete().eq("id", comment_id).execute()
 
     # ============================================================
     # Delete

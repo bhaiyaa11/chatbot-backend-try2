@@ -804,6 +804,14 @@ canvas_manager = CanvasManager()
 # FRONTEND_ORIGIN = "http://localhost:5173"
 FRONTEND_ORIGIN = "https://chatbot-aim.vercel.app/"
 
+STORYBOARD_ALLOWED_ASSET_PREFIXES = [
+    # "http://127.0.0.1:8000",
+    # "http://localhost:8000",
+    
+    # Add your production backend origin here once deployed, e.g.:
+    "https://chatbot-aim.vercel.app/",
+]
+
 # Rate limiting for the *unauthenticated* public-link endpoints below.
 # These have no JWT, so there's no per-user identity to hold
 # accountable — IP-based limiting is the baseline defense against
@@ -832,6 +840,15 @@ class CreateCanvasRequest(BaseModel):
 class UpdateCanvasContentRequest(BaseModel):
     content: Dict[str, Any]
 
+class UpdateStoryboardRequest(BaseModel):
+    storyboard: Dict[str, Any]
+
+
+class CreateStoryboardCommentRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=4000)
+    pin_x: float
+    pin_y: float
+    node_id: Optional[str] = None
 
 class UpdateCanvasTitleRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
@@ -985,6 +1002,118 @@ def update_canvas_title(
     except Exception:
         logger.exception("Failed to update canvas")
         raise HTTPException(status_code=500, detail="Failed to update canvas")
+
+
+# ================================================================
+# Storyboard
+# ================================================================
+
+# Asset URLs allowed inside storyboard nodes (images, audio). Only
+# our own backend — same trust boundary as the Tiptap AudioEmbed/Image
+# nodes already enforce client-side, now enforced server-side too.
+
+
+
+@router.patch("/{canvas_id}/storyboard")
+def update_canvas_storyboard(
+    canvas_id: str,
+    request: UpdateStoryboardRequest,
+    user_id: str = Depends(get_current_user),
+):
+    try:
+        canvas = canvas_manager.update_canvas_storyboard(
+            canvas_id=canvas_id,
+            user_id=user_id,
+            storyboard=request.storyboard,
+            allowed_asset_prefixes=STORYBOARD_ALLOWED_ASSET_PREFIXES,
+        )
+        return {"canvas": canvas}
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to edit this canvas")
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Canvas not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        logger.exception("Failed to update storyboard")
+        raise HTTPException(status_code=500, detail="Failed to update storyboard")
+
+
+# ================================================================
+# Storyboard pinned comments
+# ================================================================
+
+@router.get("/{canvas_id}/storyboard-comments")
+def list_storyboard_comments(canvas_id: str, user_id: str = Depends(get_current_user)):
+    try:
+        comments = canvas_manager.list_storyboard_comments(canvas_id=canvas_id, user_id=user_id)
+        return {"comments": comments}
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have access to this canvas")
+    except Exception:
+        logger.exception("Failed to load storyboard comments")
+        raise HTTPException(status_code=500, detail="Failed to load storyboard comments")
+
+
+@router.post("/{canvas_id}/storyboard-comments")
+def create_storyboard_comment(
+    canvas_id: str,
+    request: CreateStoryboardCommentRequest,
+    user_id: str = Depends(get_current_user),
+):
+    try:
+        comment = canvas_manager.create_storyboard_comment(
+            canvas_id=canvas_id,
+            user_id=user_id,
+            content=request.content,
+            pin_x=request.pin_x,
+            pin_y=request.pin_y,
+            node_id=request.node_id,
+        )
+        return {"comment": comment}
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have comment access to this canvas")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        logger.exception("Failed to create storyboard comment")
+        raise HTTPException(status_code=500, detail="Failed to create storyboard comment")
+
+
+@router.patch("/{canvas_id}/storyboard-comments/{comment_id}/resolve")
+def resolve_storyboard_comment(
+    canvas_id: str,
+    comment_id: str,
+    request: ResolveCommentRequest,
+    user_id: str = Depends(get_current_user),
+):
+    try:
+        comment = canvas_manager.resolve_storyboard_comment(
+            canvas_id=canvas_id, user_id=user_id,
+            comment_id=comment_id, resolved=request.resolved,
+        )
+        return {"comment": comment}
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You cannot resolve comments on this canvas")
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    except Exception:
+        logger.exception("Failed to update storyboard comment")
+        raise HTTPException(status_code=500, detail="Failed to update storyboard comment")
+
+
+@router.delete("/{canvas_id}/storyboard-comments/{comment_id}")
+def delete_storyboard_comment(canvas_id: str, comment_id: str, user_id: str = Depends(get_current_user)):
+    try:
+        canvas_manager.delete_storyboard_comment(canvas_id=canvas_id, user_id=user_id, comment_id=comment_id)
+        return {"status": "deleted"}
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You cannot delete this comment")
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    except Exception:
+        logger.exception("Failed to delete storyboard comment")
+        raise HTTPException(status_code=500, detail="Failed to delete storyboard comment")
 
 
 @router.delete("/{canvas_id}")
