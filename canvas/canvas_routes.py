@@ -812,19 +812,7 @@ STORYBOARD_ALLOWED_ASSET_PREFIXES = [
     "https://chatbot-aim.vercel.app/",
 ]
 
-# Rate limiting for the *unauthenticated* public-link endpoints below.
-# These have no JWT, so there's no per-user identity to hold
-# accountable — IP-based limiting is the baseline defense against
-# token-guessing, comment spam, and scraping. Authenticated endpoints
-# above this line are already accountable per-user via the JWT, so
-# they're not limited here (add limits there too if you want defense
-# in depth against a compromised/malicious authenticated account).
-#
-# Wire this into main.py:
-#   from canvas.canvas_routes import limiter
-#   app.state.limiter = limiter
-#   app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-#   app.add_middleware(SlowAPIMiddleware)
+
 limiter = Limiter(key_func=get_remote_address)
 
 

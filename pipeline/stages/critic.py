@@ -343,7 +343,7 @@ class CriticStage(BaseStage):
 
     # How many fact-check → rewrite cycles to allow before giving up
     # and returning the best version we have.
-    MAX_REWRITE_ITERATIONS = 2
+    MAX_REWRITE_ITERATIONS = 1
 
     async def _run_quality_check(self, script_text: str, research_brief: dict) -> dict | None:
         """Always evaluates the script and returns the shared issues/score JSON.

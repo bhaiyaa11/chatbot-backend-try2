@@ -100,25 +100,6 @@ anthropic_client = AsyncAnthropic(
 )
 
 
-
-# bearer_scheme = HTTPBearer(auto_error=False)
-
-
-
-# # Then get_current_user uses supabase_client directly:
-# async def get_current_user(
-#     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
-# ) -> str:
-#     if not credentials:
-#         raise HTTPException(status_code=401, detail="Missing Authorization header")
-#     try:
-#         response = supabase_client.auth.get_user(credentials.credentials)
-#         if not response or not response.user:
-#             raise HTTPException(status_code=401, detail="Invalid token")
-#         return response.user.id
-#     except Exception as e:
-#         raise HTTPException(status_code=401, detail=f"Auth error: {e}")
-
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
@@ -799,18 +780,6 @@ async def generate_voice(data: VoiceRequest):
         metadata
     )
 
-    # audio_bytes = b""
-
-    # async for chunk in eleven_client.text_to_speech.convert(
-    #     voice_id=voice_agent["voice_id"],
-    #     model_id="eleven_flash_v2_5",
-    #     text=narration_script,
-    #     output_format="mp3_44100_128",
-    #     voice_settings=voice_settings,
-    # ):
-    #     if chunk:
-    #         audio_bytes += chunk
-
     response = await eleven_client.text_to_speech.convert_with_timestamps(
         voice_id=voice_agent["voice_id"],
         model_id="eleven_flash_v2_5",
@@ -939,123 +908,345 @@ async def transcribe(audio: UploadFile = File(...)):
         return JSONResponse({"text": "", "error": str(e)}, status_code=500)
 
 
-# from pipeline.stages.visuals_generator import (
-#     run_storyboard_job, get_job, VIDEO_TYPE_LABELS,
-# )
 
-# VIDEO_OUTPUT_DIR = "generated_videos"
-# os.makedirs(VIDEO_OUTPUT_DIR, exist_ok=True)
-
-
-# class StoryboardRequest(BaseModel):
-#     script:     str
-#     video_type: str            # "3d_animation" | "2d_animation" | "talking_head" | "live_action_motion"
-#     quality:    str = "fast"   # "fast" | "quality"
-
-
-# @app.post("/generate-storyboard")
-# async def start_storyboard(data: StoryboardRequest, background_tasks: BackgroundTasks):
-#     if data.video_type not in VIDEO_TYPE_LABELS:
-#         return JSONResponse({"error": f"Invalid video_type. Must be one of: {list(VIDEO_TYPE_LABELS)}"}, status_code=400)
-#     if not data.script.strip():
-#         return JSONResponse({"error": "No script provided"}, status_code=400)
-
-#     job_id = str(uuid.uuid4())[:12]
-#     background_tasks.add_task(
-#         run_storyboard_job, job_id, data.script, data.video_type, data.quality, VIDEO_OUTPUT_DIR
-#     )
-#     return {"job_id": job_id, "status": "pending"}
-
-
-
-# @app.get("/generate-storyboard/{job_id}")
-# async def get_storyboard_status(job_id: str):
-#     job = get_job(job_id)
-#     if job is None:
-#         return JSONResponse({"error": "Job not found"}, status_code=404)
-
-#     return {
-#         "job_id": job.job_id,
-#         "status": job.status,          # pending | running | concatenating | done | error
-#         "total_scenes": job.total_scenes,
-#         "completed_count": len(job.completed),
-#         "error": job.error,
-#         "clips": [
-#             {"url": f"/videos/{c['filename']}", "scene_number": c["scene_number"], "caption": c["caption"]}
-#             for c in job.completed
-#         ],
-#         "final_video": (
-#             {"url": f"/videos/{job.final_video['filename']}"}
-#             if job.final_video else None
-#         ),
-#     }
-
-
-# @app.get("/videos/{filename}")
-# async def get_storyboard_video(filename: str):
-#     path = os.path.join(VIDEO_OUTPUT_DIR, filename)
-#     if not os.path.exists(path):
-#         return JSONResponse({"error": "Not found"}, status_code=404)
-#     return FileResponse(path, media_type="video/mp4")
-
-
-
-
-
+# 
+# 
+#  // Visual generator 
+# 
+# 
 
 from pipeline.stages.visuals_generator import (
-    run_storyboard_job, get_job, VIDEO_TYPE_LABELS,
+    run_storyboard_job,
+    run_scene_edit_job,
+    get_job,
+    VIDEO_TYPE_LABELS,
 )
+
+
+# ============================================================
+# STORYBOARD CONFIG
+# ============================================================
 
 STORYBOARD_OUTPUT_DIR = "generated_storyboards"
 os.makedirs(STORYBOARD_OUTPUT_DIR, exist_ok=True)
 
 
+# ============================================================
+# REQUEST MODELS
+# ============================================================
+
 class StoryboardRequest(BaseModel):
-    script:     str
-    video_type: str            # "3d_animation" | "2d_animation" | "talking_head" | "live_action_motion"
-    quality:    str = "quality"   # "fast" | "quality" | "pro"
+    script: str
+    video_type: str
+    quality: str = "quality"
+
+
+class SceneEditRequest(BaseModel):
+    prompt: str
+    mode: str = "edit"          # "edit" | "regenerate"
+    video_type: str = ""
+    quality: str = "quality"
+
 
 
 @app.post("/generate-storyboard")
-async def start_storyboard(data: StoryboardRequest, background_tasks: BackgroundTasks):
+async def start_storyboard(
+    data: StoryboardRequest,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user),
+):
+    # --------------------------------------------------------
+    # Validate video type
+    # --------------------------------------------------------
+
     if data.video_type not in VIDEO_TYPE_LABELS:
-        return JSONResponse({"error": f"Invalid video_type. Must be one of: {list(VIDEO_TYPE_LABELS)}"}, status_code=400)
+        return JSONResponse(
+            {
+                "error": (
+                    "Invalid video_type. "
+                    f"Must be one of: {list(VIDEO_TYPE_LABELS)}"
+                )
+            },
+            status_code=400,
+        )
+
+    # --------------------------------------------------------
+    # Validate script
+    # --------------------------------------------------------
+
     if not data.script.strip():
-        return JSONResponse({"error": "No script provided"}, status_code=400)
+        return JSONResponse(
+            {"error": "No script provided"},
+            status_code=400,
+        )
+
+    # --------------------------------------------------------
+    # Create job ID
+    # --------------------------------------------------------
 
     job_id = str(uuid.uuid4())[:12]
+
+    # --------------------------------------------------------
+    # Persist job in Supabase
+    # --------------------------------------------------------
+
+    try:
+        supabase_client.table("storyboard_jobs").insert(
+            {
+                "job_id": job_id,
+                "user_id": user_id,
+                "status": "pending",
+                "script": data.script,
+                "video_type": data.video_type,
+                "quality": data.quality,
+            }
+        ).execute()
+
+    except Exception as e:
+        logger.error(
+            f"[generate-storyboard] Failed to create job: {e}"
+        )
+
+        return JSONResponse(
+            {"error": "Failed to create storyboard job"},
+            status_code=500,
+        )
+
+    # --------------------------------------------------------
+    # Start generation
+    # --------------------------------------------------------
+
     background_tasks.add_task(
-        run_storyboard_job, job_id, data.script, data.video_type, data.quality, STORYBOARD_OUTPUT_DIR
+        run_storyboard_job,
+        job_id,
+        data.script,
+        data.video_type,
+        data.quality,
+        STORYBOARD_OUTPUT_DIR,
+        user_id,
     )
-    return {"job_id": job_id, "status": "pending"}
-
-
-@app.get("/generate-storyboard/{job_id}")
-async def get_storyboard_status(job_id: str):
-    job = get_job(job_id)
-    if job is None:
-        return JSONResponse({"error": "Job not found"}, status_code=404)
 
     return {
-        "job_id": job.job_id,
-        "status": job.status,          # pending | running | done | error
-        "total_scenes": job.total_scenes,
-        "completed_count": len(job.completed),
-        "error": job.error,
-        "images": [
-            {"url": f"/storyboard-images/{c['filename']}", "scene_number": c["scene_number"], "caption": c["caption"]}
-            for c in job.completed
-        ],
+        "job_id": job_id,
+        "status": "pending",
     }
 
 
+
+# ============================================================
+# EDIT / REGENERATE INDIVIDUAL SCENE
+# ============================================================
+
+@app.post("/generate-storyboard/{job_id}/scenes/{scene_number}")
+async def edit_storyboard_scene(
+    job_id: str,
+    scene_number: int,
+    data: SceneEditRequest,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user),
+):
+
+    scene_response = (
+        supabase_client
+        .table("storyboard_scenes")
+        .select("scene_number,status")
+        .eq("job_id", job_id)
+        .eq("user_id", user_id)
+        .eq("scene_number", scene_number)
+        .maybe_single()
+        .execute()
+    )
+
+    scene = scene_response.data
+
+    if not scene:
+        return JSONResponse(
+            {"error": "Scene not found"},
+            status_code=404,
+        )
+
+    if scene.get("status") == "generating":
+        return JSONResponse(
+            {"error": "Scene is already regenerating"},
+            status_code=409,
+        )
+
+    # --------------------------------------------------------
+    # Validate mode
+    # --------------------------------------------------------
+
+    if data.mode not in ("edit", "regenerate"):
+        return JSONResponse(
+            {
+                "error": (
+                    "mode must be 'edit' or 'regenerate'"
+                )
+            },
+            status_code=400,
+        )
+
+    # --------------------------------------------------------
+    # Validate prompt
+    # --------------------------------------------------------
+
+    if not data.prompt.strip():
+        return JSONResponse(
+            {"error": "prompt is required"},
+            status_code=400,
+        )
+
+
+    # --------------------------------------------------------
+    # Run edit/regeneration in background
+    # --------------------------------------------------------
+
+    background_tasks.add_task(
+        run_scene_edit_job,
+        job_id,
+        scene_number,
+        data.prompt,
+        data.mode,
+        data.video_type,
+        data.quality,
+        STORYBOARD_OUTPUT_DIR,
+        user_id,
+    )
+
+    return {
+        "status": "generating",
+        "scene_number": scene_number,
+    }
+
+
+# ============================================================
+# GET STORYBOARD STATUS
+# ============================================================
+
+
+@app.get("/generate-storyboard/{job_id}")
+async def get_storyboard_status(
+    job_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    try:
+        # ----------------------------------------------------
+        # Get storyboard job
+        # ----------------------------------------------------
+
+        job_response = (
+            supabase_client
+            .table("storyboard_jobs")
+            .select("*")
+            .eq("job_id", job_id)
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+
+        job = job_response.data
+
+        if not job:
+            return JSONResponse(
+                {"error": "Storyboard not found"},
+                status_code=404,
+            )
+
+        # ----------------------------------------------------
+        # Get scenes
+        # ----------------------------------------------------
+
+        scenes_response = (
+            supabase_client
+            .table("storyboard_scenes")
+            .select("*")
+            .eq("job_id", job_id)
+            .eq("user_id", user_id)
+            .order("scene_number")
+            .execute()
+        )
+
+        scenes = scenes_response.data or []
+
+        images = []
+
+        for scene in scenes:
+            image_data = scene.get("image_data")
+
+            if not image_data:
+                continue
+
+            # PostgreSQL stores the image as Base64 text.
+            # Turn it into a browser-readable data URL.
+            mime_type = scene.get(
+                "mime_type",
+                "image/png",
+            )
+
+            image_url = (
+                f"data:{mime_type};base64,{image_data}"
+            )
+
+            images.append(
+                {
+                    "url": image_url,
+                    "scene_number": scene["scene_number"],
+                    "caption": scene.get(
+                        "caption",
+                        "",
+                    ),
+                    "scene_status": scene.get(
+                        "status",
+                        "idle",
+                    ),
+                }
+            )
+
+        return {
+            "job_id": job["job_id"],
+            "status": job["status"],
+            "total_scenes": job["total_scenes"],
+            "completed_count": len(images),
+            "error": job.get("error"),
+            "images": images,
+        }
+
+    except Exception as e:
+        logger.error(
+            f"[generate-storyboard/{job_id}] "
+            f"Failed to load storyboard: {e}"
+        )
+
+        return JSONResponse(
+            {"error": "Failed to load storyboard"},
+            status_code=500,
+        )
+
+
+# ============================================================
+# SERVE STORYBOARD IMAGE
+# ============================================================
+
 @app.get("/storyboard-images/{filename}")
 async def get_storyboard_image(filename: str):
-    path = os.path.join(STORYBOARD_OUTPUT_DIR, filename)
+
+    path = os.path.join(
+        STORYBOARD_OUTPUT_DIR,
+        filename,
+    )
+
     if not os.path.exists(path):
-        return JSONResponse({"error": "Not found"}, status_code=404)
-    return FileResponse(path, media_type="image/png")
+        return JSONResponse(
+            {"error": "Not found"},
+            status_code=404,
+        )
+
+    return FileResponse(
+        path,
+        media_type="image/png",
+    )
+
+
+
 
 
 

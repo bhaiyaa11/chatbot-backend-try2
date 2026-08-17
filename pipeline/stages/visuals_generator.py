@@ -20,43 +20,25 @@ import base64
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from db.client import supabase
 
 from config import get_genai_client
 
 logger = logging.getLogger(__name__)
 
-# ── Config ───────────────────────────────────────────────────────────
-# "Nano Banana" is Google's branding for its Gemini native image models.
-# As of mid-2026 it's a family of four, but NOT all of them are available
-# on Vertex AI yet — the 3.1 Flash Image / Flash Lite Image models
-# ("Nano Banana 2") currently 404 on Vertex's publisher-model endpoint
-# even with a valid region; they appear to be Gemini-API-only for now.
-# On Vertex, stick to what's confirmed on the global endpoint:
-#   - gemini-2.5-flash-image        → works today, but Google has
-#                                      announced it shuts down Oct 2 2026
-#   - gemini-3-pro-image-preview    → "Nano Banana Pro", best text-in-image,
-#                                      up to 4K (confirm exact preview
-#                                      suffix in your Model Garden — Google
-#                                      changes these)
-#
-# IMPORTANT: this also requires get_genai_client() to use location
-# "global" or a specific supported region (e.g. "us-central1") — a bare
-# "us" is not a valid Vertex location and will 404 regardless of model.
+
 IMAGE_MODELS = {
-    "fast":    "gemini-2.5-flash-image",
-    "quality": "gemini-2.5-flash-image",
-    "pro":     "gemini-3-pro-image-preview",
+    "fast": "gemini-3.1-flash-lite-image",
+    "quality": "gemini-3.1-flash-image",
+    "pro": "gemini-3-pro-image",
 }
+quality = "fast"
 
 _genai_client = None
 def _get_image_client():
     global _genai_client
     if _genai_client is None:
-        # Vertex AI's image models are exposed on the "global" endpoint (or
-        # specific regions like "us-central1") — a bare "us" 404s regardless
-        # of model. Kept independent of STAGE_LOCATIONS/config.py's default
-        # so this doesn't silently break if that default changes for the
-        # text stages.
         _genai_client = get_genai_client(location="global")
     return _genai_client
 
@@ -153,75 +135,279 @@ def _is_rate_limit_error(exc: Exception) -> bool:
     return "RESOURCE_EXHAUSTED" in msg or "429" in msg
 
 
-def _generate_image_sync(prompt: str, model_key: str) -> bytes:
+def _generate_image_sync(
+    prompt: str,
+    model_key: str,
+    reference_image_bytes: bytes | None = None,
+) -> bytes:
+
     client = _get_image_client()
-    model = IMAGE_MODELS.get(model_key, IMAGE_MODELS["quality"])
+    model = IMAGE_MODELS.get(
+        model_key,
+        IMAGE_MODELS["quality"],
+    )
+
+    # --------------------------------------------------------
+    # Build request contents
+    # --------------------------------------------------------
+
+    contents = [prompt]
+
+    if reference_image_bytes is not None:
+        from google.genai import types
+
+        contents = [
+            types.Part.from_bytes(
+                data=reference_image_bytes,
+                mime_type="image/png",
+            ),
+            prompt,
+        ]
+
+    # --------------------------------------------------------
+    # Generate image
+    # --------------------------------------------------------
 
     last_exc = None
+
     for attempt in range(IMAGE_GEN_MAX_RETRIES):
+
         try:
+
             response = client.models.generate_content(
                 model=model,
-                contents=[prompt],
+                contents=contents,
             )
-            break
+
+            # ------------------------------------------------
+            # DEBUG RESPONSE
+            # ------------------------------------------------
+
+            candidates = getattr(
+                response,
+                "candidates",
+                None,
+            )
+
+            if not candidates:
+                logger.error(
+                    "[visuals_generator] Gemini returned "
+                    "no candidates"
+                )
+
+
+                raise RuntimeError(
+                    "Gemini returned no candidates"
+                )
+
+            # ------------------------------------------------
+            # Extract parts
+            # ------------------------------------------------
+
+            parts = getattr(
+                response,
+                "parts",
+                None,
+            )
+
+            if parts is None:
+
+                content = getattr(
+                    candidates[0],
+                    "content",
+                    None,
+                )
+
+                parts = getattr(
+                    content,
+                    "parts",
+                    None,
+                )
+
+
+            if not parts:
+
+                logger.error(
+                    f"[visuals_generator] "
+                    f"Candidate content: "
+                    f"{candidates[0].content}"
+                )
+
+                raise RuntimeError(
+                    "Gemini returned no content parts"
+                )
+
+            # ------------------------------------------------
+            # Look for image
+            # ------------------------------------------------
+
+            for index, part in enumerate(parts):
+
+
+                # --------------------------------------------
+                # Image data
+                # --------------------------------------------
+
+                inline_data = getattr(
+                    part,
+                    "inline_data",
+                    None,
+                )
+
+                if inline_data is not None:
+
+                    data = inline_data.data
+
+                    if isinstance(data, str):
+                        return base64.b64decode(data)
+
+                    return data
+
+                # --------------------------------------------
+                # Text response
+                # --------------------------------------------
+
+                text = getattr(
+                    part,
+                    "text",
+                    None,
+                )
+
+                if text:
+                    logger.warning(
+                        "[visuals_generator] "
+                        f"Gemini returned text instead "
+                        f"of image: {text[:500]}"
+                    )
+
+            # ------------------------------------------------
+            # Nothing usable
+            # ------------------------------------------------
+
+            logger.error(
+                "[visuals_generator] "
+                "No image data found in Gemini response"
+            )
+
+            logger.error(
+                f"[visuals_generator] Full response: "
+                f"{response}"
+            )
+
+            raise RuntimeError(
+                "Nano Banana returned no image data"
+            )
+
         except Exception as e:
+
             last_exc = e
-            if not _is_rate_limit_error(e) or attempt == IMAGE_GEN_MAX_RETRIES - 1:
+
+            if (
+                not _is_rate_limit_error(e)
+                or attempt == IMAGE_GEN_MAX_RETRIES - 1
+            ):
                 raise
-            wait_s = min(IMAGE_GEN_BACKOFF_BASE_S * (2 ** attempt), IMAGE_GEN_BACKOFF_MAX_S)
+
+            wait_s = min(
+                IMAGE_GEN_BACKOFF_BASE_S * (2 ** attempt),
+                IMAGE_GEN_BACKOFF_MAX_S,
+            )
+
             logger.warning(
-                f"[visuals_generator] Rate limited (attempt {attempt + 1}/{IMAGE_GEN_MAX_RETRIES}), "
+                f"[visuals_generator] Rate limited "
+                f"(attempt {attempt + 1}/"
+                f"{IMAGE_GEN_MAX_RETRIES}), "
                 f"retrying in {wait_s}s"
             )
+
             time.sleep(wait_s)
-    else:
-        raise last_exc
 
-    parts = getattr(response, "parts", None)
-    if parts is None:
-        # Fallback for SDK versions where the convenience `.parts`
-        # accessor isn't available.
-        parts = response.candidates[0].content.parts
-
-    for part in parts:
-        inline_data = getattr(part, "inline_data", None)
-        if inline_data is not None:
-            data = inline_data.data
-            # Some SDK versions return raw bytes, others base64 text.
-            if isinstance(data, str):
-                return base64.b64decode(data)
-            return data
-
-    raise RuntimeError("Nano Banana returned no image data")
+    raise last_exc
 
 
-async def generate_scene_image(scene: Scene, video_type: str, model_key: str, output_dir: str) -> dict:
-    prompt = build_image_prompt(scene, video_type)
-    filename = f"{uuid.uuid4()}.png"
-    local_path = os.path.join(output_dir, filename)
 
-    image_bytes = await asyncio.to_thread(_generate_image_sync, prompt, model_key)
+async def generate_scene_image(
+    scene: Scene,
+    video_type: str,
+    model_key: str,
+    output_dir: str,
+    user_id: str,
+    job_id: str,
+) -> dict:
 
-    with open(local_path, "wb") as f:
-        f.write(image_bytes)
+    prompt = build_image_prompt(
+        scene,
+        video_type,
+    )
+
+    image_bytes = await asyncio.to_thread(
+        _generate_image_sync,
+        prompt,
+        model_key,
+    )
+
+    # ---------------------------------------------
+    # Save image + metadata directly to Supabase DB
+    # ---------------------------------------------
+
+    _save_storyboard_scene(
+        user_id=user_id,
+        job_id=job_id,
+        scene_number=scene.scene_number,
+        image_data=image_bytes,
+        caption=scene.visual_description[:120],
+        prompt=prompt,
+        status="idle",
+    )
 
     return {
-        "filename": filename,
         "scene_number": scene.scene_number,
         "caption": scene.visual_description[:120],
         "prompt": prompt,
     }
 
 
-# ── Job orchestration (in-memory) ───────────────────────────────────
+    # --------------------------------------------------------
+    # Upload image to Supabase Storage
+    # --------------------------------------------------------
+
+    storage_path = _upload_storyboard_image(
+        user_id=user_id,
+        job_id=job_id,
+        scene_number=scene.scene_number,
+        image_bytes=image_bytes,
+    )
+
+    # --------------------------------------------------------
+    # Persist scene metadata
+    # --------------------------------------------------------
+
+    _save_storyboard_scene(
+        user_id=user_id,
+        job_id=job_id,
+        scene_number=scene.scene_number,
+        storage_path=storage_path,
+        caption=scene.visual_description[:120],
+        prompt=prompt,
+        status="idle",
+    )
+
+    return {
+        "storage_path": storage_path,
+        "scene_number": scene.scene_number,
+        "caption": scene.visual_description[:120],
+        "prompt": prompt,
+    }
+
+
 @dataclass
 class StoryboardJob:
     job_id: str
-    status: str = "pending"          # pending | running | done | error
+    status: str = "pending"
     total_scenes: int = 0
-    completed: list = field(default_factory=list)  # list of image dicts
+    completed: list = field(default_factory=list)
     error: str | None = None
+    scene_status: dict = field(default_factory=dict)   # scene_number -> "idle" | "generating" | "error"
 
 
 _jobs: dict[str, StoryboardJob] = {}
@@ -231,34 +417,454 @@ def get_job(job_id: str) -> StoryboardJob | None:
     return _jobs.get(job_id)
 
 
-async def run_storyboard_job(job_id: str, script_text: str, video_type: str, model_key: str, output_dir: str):
-    job = StoryboardJob(job_id=job_id)
+# SUPABASE_BUCKET = "storyboard-assets"
+
+
+def _update_storyboard_job(job_id: str, **updates):
+    """
+    Update persistent storyboard job metadata in Supabase.
+    """
+    try:
+        supabase.table("storyboard_jobs").update(
+            updates
+        ).eq(
+            "job_id", job_id
+        ).execute()
+    except Exception as e:
+        logger.error(
+            f"[visuals_generator] Failed to update job "
+            f"{job_id}: {e}"
+        )
+
+
+def _save_storyboard_scene(
+    *,
+    user_id: str,
+    job_id: str,
+    scene_number: int,
+    image_data: bytes,
+    caption: str,
+    prompt: str,
+    status: str = "idle",
+):
+    payload = {
+        "job_id": job_id,
+        "user_id": user_id,
+        "scene_number": scene_number,
+        "image_data": base64.b64encode(
+            image_data
+        ).decode("ascii"),
+        "mime_type": "image/png",
+        "caption": caption,
+        "prompt": prompt,
+        "status": status,
+        "updated_at": datetime.now(
+            timezone.utc
+        ).isoformat(),
+    }
+
+    try:
+        supabase.table(
+            "storyboard_scenes"
+        ).upsert(
+            payload,
+            on_conflict="job_id,scene_number",
+        ).execute()
+
+    except Exception as e:
+        logger.error(
+            "[visuals_generator] Failed to save "
+            f"scene {scene_number}: {e}"
+        )
+        raise
+
+
+async def run_storyboard_job(
+    job_id: str,
+    script_text: str,
+    video_type: str,
+    model_key: str,
+    output_dir: str,
+    user_id: str,
+):
+    """
+    Generate all storyboard scenes.
+
+    Supabase is the persistent source of truth.
+    _jobs remains as temporary runtime state so the
+    existing application flow continues to work during
+    generation.
+    """
+
+    job = StoryboardJob(
+        job_id=job_id,
+    )
+
     _jobs[job_id] = job
 
-    scenes = parse_scenes_from_script(script_text)
-    job.total_scenes = len(scenes)
-    if not scenes:
+    try:
+        # ----------------------------------------------------
+        # Parse scenes
+        # ----------------------------------------------------
+
+        scenes = parse_scenes_from_script(
+            script_text
+        )
+
+        job.total_scenes = len(scenes)
+
+        # Persist total scene count
+        _update_storyboard_job(
+            job_id,
+            status="running",
+            total_scenes=len(scenes),
+        )
+
+        if not scenes:
+            job.status = "error"
+            job.error = (
+                "No scenes could be parsed from the script"
+            )
+
+            _update_storyboard_job(
+                job_id,
+                status="error",
+                error=job.error,
+            )
+
+            return
+
+        # ----------------------------------------------------
+        # Generate scenes
+        # ----------------------------------------------------
+
+        job.status = "running"
+
+        for scene in scenes:
+
+            job.scene_status[
+                scene.scene_number
+            ] = "generating"
+
+            try:
+                image = await generate_scene_image(
+                    scene=scene,
+                    video_type=video_type,
+                    model_key=model_key,
+                    output_dir=output_dir,
+                    user_id=user_id,
+                    job_id=job_id,
+                )
+
+                job.completed.append(image)
+
+                job.scene_status[
+                    scene.scene_number
+                ] = "idle"
+
+                logger.info(
+                    "[visuals_generator] "
+                    f"Scene {scene.scene_number} "
+                    "saved to Supabase"
+                )
+
+            except Exception as e:
+
+                job.scene_status[
+                    scene.scene_number
+                ] = "error"
+
+                logger.error(
+                    "[visuals_generator] "
+                    f"Scene {scene.scene_number} "
+                    f"failed: {e}"
+                )
+
+            finally:
+                # Keep the existing pacing between scenes.
+                await asyncio.sleep(
+                    SCENE_PACING_DELAY_S
+                )
+
+        # ----------------------------------------------------
+        # Final job status
+        # ----------------------------------------------------
+
+        if not job.completed:
+
+            job.status = "error"
+            job.error = (
+                "All scenes failed to generate"
+            )
+
+            _update_storyboard_job(
+                job_id,
+                status="error",
+                error=job.error,
+            )
+
+            return
+
+        job.status = "done"
+
+        _update_storyboard_job(
+            job_id,
+            status="done",
+            total_scenes=job.total_scenes,
+            error=None,
+        )
+
+        logger.info(
+            "[visuals_generator] "
+            f"Storyboard {job_id} completed: "
+            f"{len(job.completed)}/{job.total_scenes} scenes"
+        )
+
+    except Exception as e:
+
         job.status = "error"
-        job.error = "No scenes could be parsed from the script"
-        return
+        job.error = str(e)
 
-    job.status = "running"
-    os.makedirs(output_dir, exist_ok=True)
+        _update_storyboard_job(
+            job_id,
+            status="error",
+            error=job.error,
+        )
 
-    for scene in scenes:
+        logger.error(
+            "[visuals_generator] "
+            f"Storyboard job {job_id} failed: {e}"
+        )
+
+
+
+async def run_scene_edit_job(
+    job_id: str,
+    scene_number: int,
+    prompt: str,
+    mode: str,
+    video_type: str | None,
+    model_key: str,
+    output_dir: str,
+    user_id: str,
+):
+    """
+    Edit or regenerate a persisted storyboard scene.
+
+    Supabase PostgreSQL is the persistent source of truth.
+    Images are stored as Base64 text in storyboard_scenes.image_data.
+    """
+
+    try:
+        # ----------------------------------------------------
+        # Find the persisted scene
+        # ----------------------------------------------------
+
+        response = (
+            supabase
+            .table("storyboard_scenes")
+            .select("*")
+            .eq("job_id", job_id)
+            .eq("user_id", user_id)
+            .eq("scene_number", scene_number)
+            .maybe_single()
+            .execute()
+        )
+
+        scene = response.data
+
+        if not scene:
+            logger.error(
+                "[visuals_generator] Scene not found: "
+                f"job={job_id}, scene={scene_number}"
+            )
+            return
+
+        # ----------------------------------------------------
+        # Mark scene as generating
+        # ----------------------------------------------------
+
+        supabase.table("storyboard_scenes").update(
+            {
+                "status": "generating",
+                "updated_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+            }
+        ).eq(
+            "job_id", job_id
+        ).eq(
+            "user_id", user_id
+        ).eq(
+            "scene_number", scene_number
+        ).execute()
+
+        # ----------------------------------------------------
+        # Prepare prompt
+        # ----------------------------------------------------
+
+        final_prompt = prompt.strip()
+        reference_bytes = None
+
+        # ----------------------------------------------------
+        # EDIT
+        # ----------------------------------------------------
+        #
+        # For an edit, use the existing image stored in
+        # PostgreSQL as Base64 text.
+        #
+
+        if mode == "edit":
+
+            existing_image_data = scene.get("image_data")
+
+            if not existing_image_data:
+                raise RuntimeError(
+                    f"Scene {scene_number} has no stored image data"
+                )
+
+            reference_bytes = base64.b64decode(
+                existing_image_data
+            )
+
+        # ----------------------------------------------------
+        # REGENERATE
+        # ----------------------------------------------------
+
+        elif mode == "regenerate" and video_type:
+
+            reference_bytes = None
+
+            style = VIDEO_TYPE_STYLE_PROMPTS.get(
+                video_type,
+                VIDEO_TYPE_STYLE_PROMPTS[
+                    "live_action_motion"
+                ],
+            )
+
+            final_prompt = (
+                f"{prompt.strip()}. "
+                f"Style: {style}. "
+                "16:9 widescreen storyboard frame, "
+                "no on-screen text, no captions, "
+                "no watermark or logo."
+            )
+
+        # ----------------------------------------------------
+        # Validate mode
+        # ----------------------------------------------------
+
+        elif mode not in ("edit", "regenerate"):
+
+            raise ValueError(
+                "mode must be 'edit' or 'regenerate'"
+            )
+
+        # ----------------------------------------------------
+        # Generate replacement image
+        # ----------------------------------------------------
+
+        image_bytes = await asyncio.to_thread(
+            _generate_image_sync,
+            final_prompt,
+            model_key,
+            reference_bytes,
+        )
+
+        if not image_bytes:
+            raise RuntimeError(
+                "Image generation returned no image data"
+            )
+
+        # ----------------------------------------------------
+        # Save replacement directly to PostgreSQL
+        # ----------------------------------------------------
+
+        _save_storyboard_scene(
+            user_id=user_id,
+            job_id=job_id,
+            scene_number=scene_number,
+            image_data=image_bytes,
+            caption=prompt.strip()[:120],
+            prompt=final_prompt,
+            status="idle",
+        )
+
+        # ----------------------------------------------------
+        # Update temporary in-memory state if it exists
+        # ----------------------------------------------------
+
+        job = get_job(job_id)
+
+        if job is not None:
+
+            for item in job.completed:
+
+                if item.get("scene_number") == scene_number:
+
+                    item["caption"] = prompt.strip()[:120]
+                    item["prompt"] = final_prompt
+
+                    # No storage_path anymore.
+                    # The persistent image lives in Supabase DB.
+
+                    break
+
+            job.scene_status[
+                scene_number
+            ] = "idle"
+
+        logger.info(
+            "[visuals_generator] "
+            f"Scene {scene_number} updated successfully"
+        )
+
+    except Exception as e:
+
+        logger.error(
+            "[visuals_generator] "
+            f"Scene {scene_number} edit failed: {e}"
+        )
+
+        # ----------------------------------------------------
+        # Mark scene as error in Supabase
+        # ----------------------------------------------------
+
         try:
-            image = await generate_scene_image(scene, video_type, model_key, output_dir)
-            job.completed.append(image)
-        except Exception as e:
-            logger.error(f"[visuals_generator] Scene {scene.scene_number} failed: {e}")
-        finally:
-            # Small gap between scenes regardless of success/failure — keeps
-            # a normal storyboard from bursting past Vertex's per-minute quota.
-            await asyncio.sleep(SCENE_PACING_DELAY_S)
 
-    if not job.completed:
-        job.status = "error"
-        job.error = "All scenes failed to generate"
-        return
+            supabase.table(
+                "storyboard_scenes"
+            ).update(
+                {
+                    "status": "error",
+                    "updated_at": datetime.now(
+                        timezone.utc
+                    ).isoformat(),
+                }
+            ).eq(
+                "job_id", job_id
+            ).eq(
+                "user_id", user_id
+            ).eq(
+                "scene_number", scene_number
+            ).execute()
 
-    job.status = "done"
+        except Exception as db_error:
+
+            logger.error(
+                "[visuals_generator] "
+                f"Failed to mark scene {scene_number} "
+                f"as error: {db_error}"
+            )
+
+        # ----------------------------------------------------
+        # Update temporary in-memory state
+        # ----------------------------------------------------
+
+        job = get_job(job_id)
+
+        if job is not None:
+            job.scene_status[
+                scene_number
+            ] = "error"
+
