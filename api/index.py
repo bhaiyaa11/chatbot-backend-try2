@@ -352,7 +352,7 @@ async def chat(
                         metadata={"trace_id": trace_id},
                         user_id=user_id,
                     )
-
+                    yield f"message_id:{assistant_msg.id}\n"   # NEW
             
 
         except Exception as e:
@@ -939,6 +939,8 @@ class StoryboardRequest(BaseModel):
     script: str
     video_type: str
     quality: str = "quality"
+    message_id: str | None = None   # NEW
+
 
 
 class SceneEditRequest(BaseModel):
@@ -946,6 +948,7 @@ class SceneEditRequest(BaseModel):
     mode: str = "edit"          # "edit" | "regenerate"
     video_type: str = ""
     quality: str = "quality"
+    message_id: str | None = None   # NEW
 
 
 
@@ -995,6 +998,7 @@ async def start_storyboard(
             {
                 "job_id": job_id,
                 "user_id": user_id,
+                "message_id": data.message_id,   # NEW
                 "status": "pending",
                 "script": data.script,
                 "video_type": data.video_type,
@@ -1169,35 +1173,51 @@ async def get_storyboard_status(
 
         images = []
 
+        # for scene in scenes:
+        #     image_data = scene.get("image_data")
+
+        #     if not image_data:
+        #         continue
+
+        #     # PostgreSQL stores the image as Base64 text.
+        #     # Turn it into a browser-readable data URL.
+        #     mime_type = scene.get(
+        #         "mime_type",
+        #         "image/png",
+        #     )
+
+        #     image_url = (
+        #         f"data:{mime_type};base64,{image_data}"
+        #     )
+
+        #     images.append(
+        #         {
+        #             "url": image_url,
+        #             "scene_number": scene["scene_number"],
+        #             "caption": scene.get(
+        #                 "caption",
+        #                 "",
+        #             ),
+        #             "scene_status": scene.get(
+        #                 "status",
+        #                 "idle",
+        #             ),
+        #         }
+        #     )
         for scene in scenes:
-            image_data = scene.get("image_data")
+            image_url = scene.get("image_url")
 
-            if not image_data:
+            if not image_url:
+                # Pre-migration row with only base64 data — skip it,
+                # per decision not to backfill old rows.
                 continue
-
-            # PostgreSQL stores the image as Base64 text.
-            # Turn it into a browser-readable data URL.
-            mime_type = scene.get(
-                "mime_type",
-                "image/png",
-            )
-
-            image_url = (
-                f"data:{mime_type};base64,{image_data}"
-            )
 
             images.append(
                 {
                     "url": image_url,
                     "scene_number": scene["scene_number"],
-                    "caption": scene.get(
-                        "caption",
-                        "",
-                    ),
-                    "scene_status": scene.get(
-                        "status",
-                        "idle",
-                    ),
+                    "caption": scene.get("caption", ""),
+                    "scene_status": scene.get("status", "idle"),
                 }
             )
 
@@ -1249,6 +1269,62 @@ async def get_storyboard_image(filename: str):
 
 
 
+
+@app.get("/messages/{message_id}/storyboard")
+async def get_storyboard_for_message(
+    message_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    job_res = (
+        supabase_client.table("storyboard_jobs")
+        .select("*")
+        .eq("message_id", message_id)
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .maybe_single()
+        .execute()
+    )
+    job = job_res.data if job_res else None   # CHANGED
+    if not job:
+        return {"job_id": None}
+
+    scenes_res = (
+        supabase_client.table("storyboard_scenes")
+        .select("*")
+        .eq("job_id", job["job_id"])
+        .eq("user_id", user_id)
+        .order("scene_number")
+        .execute()
+    )
+    scenes = (scenes_res.data if scenes_res else None) or []   # CHANGED
+
+    # images = [
+    #     {
+    #         "url": f"data:{s.get('mime_type','image/png')};base64,{s['image_data']}",
+    #         "scene_number": s["scene_number"],
+    #         "caption": s.get("caption", ""),
+    #         "scene_status": s.get("status", "idle"),
+    #     }
+    #     for s in scenes if s.get("image_data")
+    # ]
+    images = [
+        {
+            "url": s["image_url"],
+            "scene_number": s["scene_number"],
+            "caption": s.get("caption", ""),
+            "scene_status": s.get("status", "idle"),
+        }
+        for s in scenes if s.get("image_url")
+    ]
+    return {
+        "job_id": job["job_id"],
+        "video_type": job.get("video_type"),
+        "status": job["status"],
+        "total_scenes": job.get("total_scenes", 0),
+        "images": images,
+        "error": job.get("error"),
+    }
 
 
 # uvicorn api.index:app --reload

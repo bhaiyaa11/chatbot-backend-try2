@@ -35,6 +35,37 @@ IMAGE_MODELS = {
 }
 quality = "fast"
 
+
+
+
+
+STORYBOARD_STORAGE_BUCKET = "storyboard-assets"
+
+
+def _upload_image_to_storage(
+    *,
+    user_id: str,
+    job_id: str,
+    scene_number: int,
+    image_bytes: bytes,
+) -> str:
+    """
+    Upload a generated scene image to Supabase Storage and return
+    its public URL.
+    """
+    path = f"{user_id}/{job_id}/scene_{scene_number}_{uuid.uuid4().hex[:8]}.png"
+
+    supabase.storage.from_(STORYBOARD_STORAGE_BUCKET).upload(
+        path,
+        image_bytes,
+        {"content-type": "image/png"},
+    )
+
+    public_url = supabase.storage.from_(STORYBOARD_STORAGE_BUCKET).get_public_url(path)
+    return public_url
+
+
+
 _genai_client = None
 def _get_image_client():
     global _genai_client
@@ -339,7 +370,6 @@ async def generate_scene_image(
         scene,
         video_type,
     )
-
     image_bytes = await asyncio.to_thread(
         _generate_image_sync,
         prompt,
@@ -347,14 +377,22 @@ async def generate_scene_image(
     )
 
     # ---------------------------------------------
-    # Save image + metadata directly to Supabase DB
+    # Upload to Supabase Storage, then save the URL
     # ---------------------------------------------
+
+    image_url = await asyncio.to_thread(
+        _upload_image_to_storage,
+        user_id=user_id,
+        job_id=job_id,
+        scene_number=scene.scene_number,
+        image_bytes=image_bytes,
+    )
 
     _save_storyboard_scene(
         user_id=user_id,
         job_id=job_id,
         scene_number=scene.scene_number,
-        image_data=image_bytes,
+        image_url=image_url,
         caption=scene.visual_description[:120],
         prompt=prompt,
         status="idle",
@@ -365,6 +403,31 @@ async def generate_scene_image(
         "caption": scene.visual_description[:120],
         "prompt": prompt,
     }
+    # image_bytes = await asyncio.to_thread(
+    #     _generate_image_sync,
+    #     prompt,
+    #     model_key,
+    # )
+
+    # # ---------------------------------------------
+    # # Save image + metadata directly to Supabase DB
+    # # ---------------------------------------------
+
+    # _save_storyboard_scene(
+    #     user_id=user_id,
+    #     job_id=job_id,
+    #     scene_number=scene.scene_number,
+    #     image_data=image_bytes,
+    #     caption=scene.visual_description[:120],
+    #     prompt=prompt,
+    #     status="idle",
+    # )
+
+    # return {
+    #     "scene_number": scene.scene_number,
+    #     "caption": scene.visual_description[:120],
+    #     "prompt": prompt,
+    # }
 
 
     # --------------------------------------------------------
@@ -437,12 +500,39 @@ def _update_storyboard_job(job_id: str, **updates):
         )
 
 
+# def _save_storyboard_scene(
+#     *,
+#     user_id: str,
+#     job_id: str,
+#     scene_number: int,
+#     image_data: bytes,
+#     caption: str,
+#     prompt: str,
+#     status: str = "idle",
+# ):
+#     payload = {
+#         "job_id": job_id,
+#         "user_id": user_id,
+#         "scene_number": scene_number,
+#         "image_data": base64.b64encode(
+#             image_data
+#         ).decode("ascii"),
+#         "mime_type": "image/png",
+#         "caption": caption,
+#         "prompt": prompt,
+#         "status": status,
+#         "updated_at": datetime.now(
+#             timezone.utc
+#         ).isoformat(),
+#     }
+
+
 def _save_storyboard_scene(
     *,
     user_id: str,
     job_id: str,
     scene_number: int,
-    image_data: bytes,
+    image_url: str,
     caption: str,
     prompt: str,
     status: str = "idle",
@@ -451,9 +541,7 @@ def _save_storyboard_scene(
         "job_id": job_id,
         "user_id": user_id,
         "scene_number": scene_number,
-        "image_data": base64.b64encode(
-            image_data
-        ).decode("ascii"),
+        "image_url": image_url,
         "mime_type": "image/png",
         "caption": caption,
         "prompt": prompt,
@@ -714,18 +802,35 @@ async def run_scene_edit_job(
         # PostgreSQL as Base64 text.
         #
 
-        if mode == "edit":
+        # if mode == "edit":
 
+        #     existing_image_data = scene.get("image_data")
+
+        #     if not existing_image_data:
+        #         raise RuntimeError(
+        #             f"Scene {scene_number} has no stored image data"
+        #         )
+
+        #     reference_bytes = base64.b64decode(
+        #         existing_image_data
+        #     )
+        if mode == "edit":
+            existing_image_url = scene.get("image_url")
             existing_image_data = scene.get("image_data")
 
-            if not existing_image_data:
+            if existing_image_url:
+                import httpx
+                async with httpx.AsyncClient() as http_client:
+                    resp = await http_client.get(existing_image_url)
+                    resp.raise_for_status()
+                    reference_bytes = resp.content
+            elif existing_image_data:
+                # Fallback for pre-migration rows still on base64
+                reference_bytes = base64.b64decode(existing_image_data)
+            else:
                 raise RuntimeError(
-                    f"Scene {scene_number} has no stored image data"
+                    f"Scene {scene_number} has no stored image"
                 )
-
-            reference_bytes = base64.b64decode(
-                existing_image_data
-            )
 
         # ----------------------------------------------------
         # REGENERATE
@@ -777,18 +882,45 @@ async def run_scene_edit_job(
             )
 
         # ----------------------------------------------------
-        # Save replacement directly to PostgreSQL
+        # Upload replacement to Supabase Storage, save the URL
         # ----------------------------------------------------
+
+        image_url = await asyncio.to_thread(
+            _upload_image_to_storage,
+            user_id=user_id,
+            job_id=job_id,
+            scene_number=scene_number,
+            image_bytes=image_bytes,
+        )
 
         _save_storyboard_scene(
             user_id=user_id,
             job_id=job_id,
             scene_number=scene_number,
-            image_data=image_bytes,
+            image_url=image_url,
             caption=prompt.strip()[:120],
             prompt=final_prompt,
             status="idle",
         )
+
+        # if not image_bytes:
+        #     raise RuntimeError(
+        #         "Image generation returned no image data"
+        #     )
+
+        # # ----------------------------------------------------
+        # # Save replacement directly to PostgreSQL
+        # # ----------------------------------------------------
+
+        # _save_storyboard_scene(
+        #     user_id=user_id,
+        #     job_id=job_id,
+        #     scene_number=scene_number,
+        #     image_data=image_bytes,
+        #     caption=prompt.strip()[:120],
+        #     prompt=final_prompt,
+        #     status="idle",
+        # )
 
         # ----------------------------------------------------
         # Update temporary in-memory state if it exists
