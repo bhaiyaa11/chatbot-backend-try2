@@ -785,7 +785,8 @@ MODEL_ENDPOINTS = {
     "CRITIC": [
         # "projects/poc-script-genai/locations/global/publishers/google/models/gemini-3-flash-preview",
         # "gemini-2.5-flash-lite",
-        "claude-sonnet-4-6",
+        # "claude-sonnet-4-6",
+        "claude-opus-5",
     ],
 }
 

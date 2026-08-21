@@ -144,7 +144,18 @@ VOICE_AGENTS = {
     "ELEANOR_BRIT_OLD_AD":{"voice_id":os.getenv("ELEANOR_BRIT_OLD_AD")},
     "EVELYN_BRIT_YOUNG_N_CONVO":{"voice_id":os.getenv("EVELYN_BRIT_YOUNG_N_CONVO")},
     "MARSHAL_BRIT_MID_N_CONVO":{"voice_id":os.getenv("MARSHAL_BRIT_MID_N_CONVO")},
-    "DARCY_BRIT_MID_N_SM":{"voice_id":os.getenv("DARCY_BRIT_MID_N_SM")},
+    "DARCY_BRIT_MID_N_SM":{"voice_id":os.getenv("DARCY_BRIT_MID_N_SM")}, 
+    "KAIRA_AMER_Y_F_C":{"voice_id":os.getenv("KAIRA_AMER_Y_F_C")},
+    "JENI_AMER_Y_F_C":{"voice_id":os.getenv("JENI_AMER_Y_F_C")},
+    "IVANNA_AMER_Y_F_C":{"voice_id":os.getenv("IVANNA_AMER_Y_F_C")},
+    "BHEE_AMER_Y_F_C":{"voice_id":os.getenv("BHEE_AMER_Y_F_C")},
+    "HOPE_AMER_Y_F_SM":{"voice_id":os.getenv("HOPE_AMER_Y_F_SM")},
+    "BRITTNEY_AMER_Y_F_SM":{"voice_id":os.getenv("BRITTNEY_AMER_Y_F_SM")},
+    "SKY_AMER_Y_F_SM":{"voice_id":os.getenv("SKY_AMER_Y_F_SM")},
+    "KRISTEN_AMER_Y_F_SM":{"voice_id":os.getenv("KRISTEN_AMER_Y_F_SM")},
+    "SIA_AMER_Y_F_AD":{"voice_id":os.getenv("SIA_AMER_Y_F_AD")},
+    "ALEXIS_AMER_Y_F_AD":{"voice_id":os.getenv("ALEXIS_AMER_Y_F_AD")},
+    "RACHELLE_AMER_Y_F_AD":{"voice_id":os.getenv("RACHELLE_AMER_Y_F_AD")},
     
 }
 

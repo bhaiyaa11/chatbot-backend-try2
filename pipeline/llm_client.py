@@ -221,7 +221,8 @@ async def generate_text(stage: str, contents: list) -> str:
                 raise RuntimeError("No content to send to CRITIC")
 
             response = await anthropic_client.messages.create(
-                model="claude-sonnet-4-6",
+                # model="claude-sonnet-4-6",
+                model="claude-opus-5",
                 max_tokens=4000,
                 messages=[
                     {
@@ -281,7 +282,8 @@ async def stream_llm(stage: str, contents: list):
                 raise RuntimeError("No content to send to CRITIC")
 
             stream = await anthropic_client.messages.create(
-                model="claude-sonnet-4-6",
+                # model="claude-sonnet-4-6",
+                model="claude-opus-5",
                 max_tokens=4000,
                 stream=True,
                 messages=[
